@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}Destination Recommendations{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12 text-center">
+            <h1>Find Your Dream Destination</h1>
+            <p class="text-muted">Let our AI-powered recommender system suggest destinations based on your preferences</p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        <i class="fas fa-exclamation-circle"></i> {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <!-- Preferences Form -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Your Preferences</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('search.search_destinations') }}">
+                        <!-- Add CSRF token -->
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="form-group mb-3">
+                            <label>Interests:</label>
+                            <div class="row">
+                                {% for interest in ['beach', 'mountains', 'city', 'culture', 'food', 'adventure', 'relaxation', 'history'] %}
+                                <div class="col-6">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="interests" value="{{ interest }}" id="interest_{{ interest }}"
+                                               {% if preferences and interest in preferences.interests %}checked{% endif %}>
+                                        <label class="form-check-label" for="interest_{{ interest }}">
+                                            {{ interest|capitalize }}
+                                        </label>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="budget">Budget (£):</label>
+                            <input type="range" class="form-range" id="budget" name="budget" min="500" max="10000" step="500" 
+                                   value="{{ preferences.budget if preferences else 2000 }}" oninput="updateBudgetValue(this.value)">
+                            <div class="text-center">
+                                <span id="budgetValue">£{{ preferences.budget if preferences else 2000 }}</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="duration">Trip Duration (days):</label>
+                            <input type="range" class="form-range" id="duration" name="duration" min="3" max="30" step="1" 
+                                   value="{{ preferences.duration if preferences else 7 }}" oninput="updateDurationValue(this.value)">
+                            <div class="text-center">
+                                <span id="durationValue">{{ preferences.duration if preferences else 7 }} days</span>
+                            </div>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="month">Travel Month:</label>
+                            <select id="month" name="month" class="form-select">
+                                {% for month_num, month_name in [(1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'), (5, 'May'), (6, 'June'), 
+                                                                (7, 'July'), (8, 'August'), (9, 'September'), (10, 'October'), (11, 'November'), (12, 'December')] %}
+                                    <option value="{{ month_num }}" {% if preferences and preferences.month == month_num %}selected{% elif not preferences and month_num == now_month %}selected{% endif %}>
+                                        {{ month_name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="form-group mb-3">
+                            <label for="age">Your Age (optional):</label>
+                            <input type="number" id="age" name="age" min="18" max="99" class="form-control" 
+                                   value="{{ preferences.age if preferences and preferences.age else '' }}" placeholder="Enter your age">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="fas fa-magic"></i> Get Recommendations
+                        </button>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">Our neural network uses your preferences to find destinations you'll love!</small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations Display -->
+        <div class="col-md-8">
+            {% if recommendations %}
+                <div class="card">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">Your Personalized Recommendations</h4>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="row g-0">
+                            {% for dest in recommendations %}
+                                <div class="col-md-6 p-2">
+                                    <div class="card h-100">
+                                        <div class="card-img-top" style="height: 180px; overflow: hidden;">
+                                            {% if dest.image_url %}
+                                                <img src="{{ dest.image_url }}" alt="{{ dest.destination }}" class="img-fluid" style="object-fit: cover; width: 100%; height: 100%;">
+                                            {% else %}
+                                                <div class="bg-light d-flex align-items-center justify-content-center" style="height: 100%;">
+                                                    <span class="text-muted">No image available</span>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ dest.destination }}</h5>
+                                            <div class="mb-2">
+                                                <div class="progress" style="height: 10px;">
+                                                    <div class="progress-bar bg-success" role="progressbar" 
+                                                         style="width: {{ (dest.score * 100)|round }}%;" 
+                                                         aria-valuenow="{{ (dest.score * 100)|round }}" 
+                                                         aria-valuemin="0" 
+                                                         aria-valuemax="100"></div>
+                                                </div>
+                                                <small class="text-muted">{{ (dest.score * 100)|round }}% match</small>
+                                            </div>
+                                            <p class="card-text">{{ dest.description }}</p>
+                                        </div>
+                                        <div class="card-footer d-flex justify-content-between">
+                                            <button class="btn btn-sm btn-outline-primary" onclick="viewSimilar('{{ dest.destination }}')">
+                                                <i class="fas fa-th"></i> Similar Places
+                                            </button>
+                                            <a href="{{ url_for('search.flight_search') }}?to={{ dest.destination }}" class="btn btn-sm btn-primary">
+                                                <i class="fas fa-plane"></i> Find Flights
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Similar Destinations Modal -->
+                <div class="modal fade" id="similarModal" tabindex="-1" aria-labelledby="similarModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="similarModalLabel">Similar Destinations</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="text-center mb-3" id="loadingSpinner">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Loading...</span>
+                                    </div>
+                                    <p>Finding similar destinations...</p>
+                                </div>
+                                <div class="row" id="similarDestinations"></div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                {% if not error %}
+                    <div class="card">
+                        <div class="card-body text-center p-5">
+                            <i class="fas fa-globe-americas fa-5x text-muted mb-3"></i>
+                            <h4>Let us help you find your next adventure!</h4>
+                            <p class="text-muted">Fill out your preferences and click "Get Recommendations" to see AI-suggested destinations.</p>
+                        </div>
+                    </div>
+                {% endif %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Update UI for range inputs
+    function updateBudgetValue(val) {
+        document.getElementById('budgetValue').textContent = '£' + val;
+    }
+    
+    function updateDurationValue(val) {
+        document.getElementById('durationValue').textContent = val + ' days';
+    }
+    
+    // For similar destinations modal
+    function viewSimilar(destination) {
+        // Show the modal
+        var modal = new bootstrap.Modal(document.getElementById('similarModal'));
+        modal.show();
+        
+        // Show loading spinner
+        document.getElementById('loadingSpinner').style.display = 'block';
+        document.getElementById('similarDestinations').innerHTML = '';
+        
+        // Update modal title
+        document.getElementById('similarModalLabel').textContent = 'Places Similar to ' + destination;
+        
+        // Fetch similar destinations
+        fetch('/search/similar-destinations/' + encodeURIComponent(destination))
+            .then(response => response.json())
+            .then(data => {
+                // Hide loading spinner
+                document.getElementById('loadingSpinner').style.display = 'none';
+                
+                // Populate similar destinations
+                var html = '';
+                data.forEach(dest => {
+                    html += `
+                        <div class="col-md-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">${dest.destination}</h5>
+                                    <p class="card-text">${dest.description}</p>
+                                    <div class="text-muted mb-2">
+                                        Similarity: ${Math.round(dest.similarity * 100)}%
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <a href="/search/flights?to=${encodeURIComponent(dest.destination)}" class="btn btn-sm btn-primary w-100">
+                                        <i class="fas fa-plane"></i> Find Flights
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('similarDestinations').innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('similarDestinations').innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i> Error loading similar destinations: ${error}
+                        </div>
+                    </div>
+                `;
+            });
+    }
+</script>
+{% endblock %}

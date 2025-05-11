@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% set active_page = "booking" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        {% if booking_type == 'flight' %}
+                        <i class="fas fa-plane me-2"></i>Flight Booking
+                        {% else %}
+                        <i class="fas fa-hotel me-2"></i>Hotel Booking
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('main.' ~ (booking_type == 'flight' and 'book_flight' or 'book_hotel'), **booking_params) }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <h4 class="mb-4">Traveler Information</h4>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    {{ form.first_name.label(class="form-label") }}
+                                    {{ form.first_name(class="form-control") }}
+                                    {% if form.first_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.first_name.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    {{ form.last_name.label(class="form-label") }}
+                                    {{ form.last_name(class="form-control") }}
+                                    {% if form.last_name.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.last_name.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    {{ form.email.label(class="form-label") }}
+                                    {{ form.email(class="form-control") }}
+                                    {% if form.email.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.email.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    {{ form.phone.label(class="form-label") }}
+                                    {{ form.phone(class="form-control") }}
+                                    {% if form.phone.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.phone.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <h4 class="mt-4 mb-4">Billing Address</h4>
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <div class="form-group">
+                                    {{ form.address.label(class="form-label") }}
+                                    {{ form.address(class="form-control") }}
+                                    {% if form.address.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.address.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="form-group">
+                                    {{ form.city.label(class="form-label") }}
+                                    {{ form.city(class="form-control") }}
+                                    {% if form.city.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.city.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-group">
+                                    {{ form.country.label(class="form-label") }}
+                                    {{ form.country(class="form-control") }}
+                                    {% if form.country.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.country.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-group">
+                                    {{ form.postal_code.label(class="form-label") }}
+                                    {{ form.postal_code(class="form-control") }}
+                                    {% if form.postal_code.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.postal_code.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if booking_type == 'hotel' %}
+                        <div class="row">
+                            <div class="col-md-12 mb-3">
+                                <div class="form-group">
+                                    {{ form.special_requests.label(class="form-label") }}
+                                    {{ form.special_requests(class="form-control", rows=3) }}
+                                    {% if form.special_requests.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.special_requests.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Optional: Any special requests for your stay? (late check-in, room preferences, etc.)</small>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <div class="form-check mb-4 mt-4">
+                            {{ form.agree_terms(class="form-check-input") }}
+                            {{ form.agree_terms.label(class="form-check-label") }}
+                            {% if form.agree_terms.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {% for error in form.agree_terms.errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Booking Summary</h4>
+                </div>
+                <div class="card-body">
+                    {% if booking_type == 'flight' %}
+                        <h5 class="card-title">Flight Details</h5>
+                        {% for segment in booking_details.segments %}
+                            <div class="mb-3 p-3 {% if loop.index > 1 %}bg-light{% endif %} rounded">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <div>
+                                        <strong>{{ segment.departure.iataCode }}</strong> → <strong>{{ segment.arrival.iataCode }}</strong>
+                                    </div>
+                                    <div>
+                                        <span class="badge bg-info">{{ segment.carrierCode }}{{ segment.number }}</span>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <div>
+                                        <small>Departure</small><br>
+                                        {{ segment.departure.at|replace('T', ' ')|replace('Z', '') }}
+                                    </div>
+                                    <div>
+                                        <small>Arrival</small><br>
+                                        {{ segment.arrival.at|replace('T', ' ')|replace('Z', '') }}
+                                    </div>
+                                </div>
+                                <div>
+                                    <small>Duration: {{ segment.duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</small>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    {% else %}
+                        <h5 class="card-title">Hotel Details</h5>
+                        <p><strong>{{ booking_details.name }}</strong></p>
+                        <p>
+                            <i class="fas fa-map-marker-alt text-danger me-1"></i>
+                            {{ booking_details.address.city }}, {{ booking_details.address.country }}
+                        </p>
+                        <p>
+                            <i class="fas fa-star text-warning me-1"></i>
+                            {{ booking_details.rating }} Stars
+                        </p>
+                        
+                        <h6 class="mt-3">Room Information</h6>
+                        <p><strong>{{ booking_details.offer.room_type }}</strong></p>
+                        <p>
+                            <i class="fas fa-user me-1"></i>
+                            {{ booking_details.offer.guests.adults }} Adults
+                        </p>
+                        <p>
+                            <i class="fas fa-calendar me-1"></i>
+                            Check-in: {{ booking_details.offer.check_in }}
+                        </p>
+                        <p>
+                            <i class="fas fa-calendar-check me-1"></i>
+                            Check-out: {{ booking_details.offer.check_out }}
+                        </p>
+                    {% endif %}
+                    
+                    <div class="mt-4 p-3 bg-light rounded">
+                        <h5>Price Details</h5>
+                        <div class="d-flex justify-content-between">
+                            <span>Total Price:</span>
+                            <span class="text-success fw-bold">
+                                {% if booking_type == 'flight' %}
+                                    {{ booking_details.price.currency }} {{ booking_details.price.total }}
+                                {% else %}
+                                    {{ booking_details.offer.price.currency }} {{ booking_details.offer.price.total }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

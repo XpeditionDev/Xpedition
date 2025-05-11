@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Save Hotel to Itinerary{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Save Hotel to Itinerary</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <p><strong>Hotel Details:</strong></p>
+                        <p><strong>{{ hotel.name }}</strong> {% if hotel.rating %}({{ hotel.rating }} ★){% endif %}</p>
+                        <p>{{ hotel.address.city }}, {{ hotel.address.country }}</p>
+                        {% if hotel.offers and hotel.offers|length > 0 %}
+                        <p>Check-in: {{ hotel.offers[0].check_in }} | Check-out: {{ hotel.offers[0].check_out }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="room_type" class="form-label">Select Room Type</label>
+                            <select class="form-control" id="room_type" name="room_type" required>
+                                <option value="" disabled>Choose a room type...</option>
+                                {% for offer in hotel.offers %}
+                                <option value="{{ offer.id }}" data-price="{{ offer.price.total }} {{ offer.price.currency }}" 
+                                        {% if hotel.initially_selected_offer and hotel.initially_selected_offer.id == offer.id %}selected{% endif %}>
+                                    {{ offer.room_type }} - {{ offer.price.total }} {{ offer.price.currency }}
+                                    ({{ offer.guests.adults }} adults)
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="itinerary_id" class="form-label">Select an Itinerary</label>
+                            <select class="form-control" id="itinerary_id" name="itinerary_id" required>
+                                <option value="" disabled selected>Choose an itinerary...</option>
+                                {% for itinerary in itineraries %}
+                                <option value="{{ itinerary.id }}">{{ itinerary.name }} ({{ itinerary.start_date.strftime('%Y-%m-%d') }} to {{ itinerary.end_date.strftime('%Y-%m-%d') }})</option>
+                                {% endfor %}
+                                <option value="new">+ Create new itinerary</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="new_itinerary_div" style="display: none;">
+                            <label for="new_itinerary_name" class="form-label">New Itinerary Name</label>
+                            <input type="text" class="form-control" id="new_itinerary_name" name="new_itinerary_name" placeholder="Enter a name for your new itinerary">
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">Save to Itinerary</button>
+                            <a href="{{ url_for('main.hotel_search') }}" class="btn btn-outline-secondary">Back to Hotel Search</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const itinerarySelect = document.getElementById('itinerary_id');
+        const newItineraryDiv = document.getElementById('new_itinerary_div');
+        
+        itinerarySelect.addEventListener('change', function() {
+            if (this.value === 'new') {
+                newItineraryDiv.style.display = 'block';
+                document.getElementById('new_itinerary_name').required = true;
+            } else {
+                newItineraryDiv.style.display = 'none';
+                document.getElementById('new_itinerary_name').required = false;
+            }
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %} 

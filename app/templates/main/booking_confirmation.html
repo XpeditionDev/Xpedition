@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active_page = "booking" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-check-circle me-2"></i>Booking Confirmed!
+                    </h3>
+                </div>
+                <div class="card-body text-center p-5">
+                    <div class="mb-4">
+                        <span class="display-1 text-success">
+                            <i class="fas fa-check-circle"></i>
+                        </span>
+                    </div>
+                    
+                    <h2 class="mb-4">Thank you for your booking!</h2>
+                    
+                    <p class="lead mb-4">
+                        Your {{ booking_type }} booking has been confirmed. A confirmation email has been sent to {{ email }}.
+                    </p>
+                    
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">Booking Reference:</h5>
+                        <p class="h3 font-monospace">{{ booking_reference }}</p>
+                    </div>
+                    
+                    <div class="mb-4">
+                        {% if booking_type == 'flight' %}
+                            <p><strong>Flight:</strong> {{ booking_details.segments[0].carrierCode }}{{ booking_details.segments[0].number }}</p>
+                            <p><strong>From:</strong> {{ booking_details.segments[0].departure.iataCode }} on {{ booking_details.segments[0].departure.at|replace('T', ' ')|replace('Z', '') }}</p>
+                            <p><strong>To:</strong> {{ booking_details.segments[0].arrival.iataCode }} on {{ booking_details.segments[0].arrival.at|replace('T', ' ')|replace('Z', '') }}</p>
+                        {% else %}
+                            <p><strong>Hotel:</strong> {{ booking_details.name }}</p>
+                            <p><strong>Check-in:</strong> {{ booking_details.offer.check_in }}</p>
+                            <p><strong>Check-out:</strong> {{ booking_details.offer.check_out }}</p>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="alert alert-success mb-4">
+                        <h5 class="alert-heading">Total Price:</h5>
+                        <p class="h3">
+                            {% if booking_type == 'flight' %}
+                                {{ booking_details.price.currency }} {{ booking_details.price.total }}
+                            {% else %}
+                                {{ booking_details.offer.price.currency }} {{ booking_details.offer.price.total }}
+                            {% endif %}
+                        </p>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center">
+                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-primary btn-lg me-md-2">
+                            <i class="fas fa-user me-2"></i>Go to My Dashboard
+                        </a>
+                        {% if booking_type == 'flight' %}
+                            <a href="{{ url_for('main.search_flights') }}" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-plane me-2"></i>Search More Flights
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('main.hotel_search') }}" class="btn btn-outline-primary btn-lg">
+                                <i class="fas fa-hotel me-2"></i>Search More Hotels
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="text-center">
+                        <small class="text-muted">If you have any questions about your booking, please contact our customer service at support@xpedition.com</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

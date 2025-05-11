@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Test Flight Saving</h1>
+    <p class="alert alert-info">This is a simple test page to verify flight saving functionality.</p>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-primary text-white">
+            <h3 class="card-title mb-0">Test Form 1: Basic Flight</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('protected.save_flight') }}">
+                <input type="hidden" name="flight_data" value='{"outbound":{"departure":{"city":"London","time":"2023-08-15T10:00:00Z","airport":"LHR"},"arrival":{"city":"New York","time":"2023-08-15T13:00:00Z","airport":"JFK"},"stops":0,"duration":"8h 00m"},"airline":"British Airways","price":{"total":500,"currency":"GBP","display":"£500"},"booking_reference":"TEST123"}' />
+                
+                <div class="form-group mb-3">
+                    <label for="itinerary_id">Select Itinerary:</label>
+                    <select id="itinerary_id" name="itinerary_id" class="form-control" required>
+                        <option value="new">Create New Itinerary</option>
+                        {% if user_itineraries %}
+                            {% for itinerary in user_itineraries %}
+                                <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="new_itinerary_name">New Itinerary Name:</label>
+                    <input type="text" id="new_itinerary_name" name="new_itinerary_name" class="form-control" value="Test Basic Flight Itinerary" />
+                </div>
+                
+                <button type="submit" class="btn btn-primary">Save Basic Flight</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">
+            <h3 class="card-title mb-0">Test Form 2: Alternative Format</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('protected.save_flight') }}">
+                <input type="hidden" name="flight_data" value='{"departure":{"airport":"LHR","time":"2023-08-15T10:00:00Z","city":"London"},"arrival":{"airport":"JFK","time":"2023-08-15T13:00:00Z","city":"New York"},"airline":"British Airways","price":{"total":500,"currency":"GBP","display":"£500"},"booking_reference":"TEST123","stops":0,"duration":"8h 00m"}' />
+                
+                <div class="form-group mb-3">
+                    <label for="itinerary_id2">Select Itinerary:</label>
+                    <select id="itinerary_id2" name="itinerary_id" class="form-control" required>
+                        <option value="new">Create New Itinerary</option>
+                        {% if user_itineraries %}
+                            {% for itinerary in user_itineraries %}
+                                <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="new_itinerary_name2">New Itinerary Name:</label>
+                    <input type="text" id="new_itinerary_name2" name="new_itinerary_name" class="form-control" value="Test Alt Format Itinerary" />
+                </div>
+                
+                <button type="submit" class="btn btn-success">Save Alternative Format</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card mb-4">
+        <div class="card-header bg-danger text-white">
+            <h3 class="card-title mb-0">Test Form 3: Minimal Required Fields</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('protected.save_flight') }}">
+                <input type="hidden" name="flight_data" value='{"departure":{"airport":"LHR","time":"2023-08-15T10:00:00Z","city":"London"},"arrival":{"airport":"JFK","time":"2023-08-15T13:00:00Z","city":"New York"},"airline":"British Airways","price":500}' />
+                
+                <div class="form-group mb-3">
+                    <label for="itinerary_id3">Select Itinerary:</label>
+                    <select id="itinerary_id3" name="itinerary_id" class="form-control" required>
+                        <option value="new">Create New Itinerary</option>
+                        {% if user_itineraries %}
+                            {% for itinerary in user_itineraries %}
+                                <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                            {% endfor %}
+                        {% endif %}
+                    </select>
+                </div>
+                
+                <div class="form-group mb-3">
+                    <label for="new_itinerary_name3">New Itinerary Name:</label>
+                    <input type="text" id="new_itinerary_name3" name="new_itinerary_name" class="form-control" value="Test Minimal Flight Itinerary" />
+                </div>
+                
+                <button type="submit" class="btn btn-danger">Save Minimal Flight</button>
+            </form>
+        </div>
+    </div>
+    
+    <div class="card">
+        <div class="card-header bg-warning">
+            <h3 class="card-title mb-0">Data Structure Information</h3>
+        </div>
+        <div class="card-body">
+            <p>The flight data being submitted in these forms matches both of the supported formats:</p>
+            
+            <h5>Format 1 (Nested with outbound):</h5>
+            <pre class="bg-light p-3 rounded">
+{
+  "outbound": {
+    "departure": {
+      "city": "London",
+      "time": "2023-08-15T10:00:00Z",
+      "airport": "LHR"
+    },
+    "arrival": {
+      "city": "New York",
+      "time": "2023-08-15T13:00:00Z",
+      "airport": "JFK"
+    },
+    "stops": 0,
+    "duration": "8h 00m"
+  },
+  "airline": "British Airways",
+  "price": {
+    "total": 500,
+    "currency": "GBP",
+    "display": "£500"
+  },
+  "booking_reference": "TEST123"
+}
+            </pre>
+            
+            <h5>Format 2 (Flat structure):</h5>
+            <pre class="bg-light p-3 rounded">
+{
+  "departure": {
+    "airport": "LHR",
+    "time": "2023-08-15T10:00:00Z",
+    "city": "London"
+  },
+  "arrival": {
+    "airport": "JFK",
+    "time": "2023-08-15T13:00:00Z",
+    "city": "New York"
+  },
+  "airline": "British Airways",
+  "price": {
+    "total": 500,
+    "currency": "GBP",
+    "display": "£500"
+  },
+  "booking_reference": "TEST123",
+  "stops": 0,
+  "duration": "8h 00m"
+}
+            </pre>
+        </div>
+    </div>
+</div>
+{% endblock %} 

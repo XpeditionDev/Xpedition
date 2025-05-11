@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Add Activity to {{ itinerary.name }}</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.csrf_token }}
+                        <div class="mb-3">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                            {% if form.name.errors %}
+                                {% for error in form.name.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.description.label(class="form-label") }}
+                            {{ form.description(class="form-control", rows=3) }}
+                            {% if form.description.errors %}
+                                {% for error in form.description.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.date.label(class="form-label") }}
+                            {{ form.date(class="form-control") }}
+                            {% if form.date.errors %}
+                                {% for error in form.date.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.duration.label(class="form-label") }}
+                            {{ form.duration(class="form-control") }}
+                            {% if form.duration.errors %}
+                                {% for error in form.duration.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                            <small class="form-text text-muted">Enter duration in minutes (e.g., 120 for 2 hours)</small>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.location.label(class="form-label") }}
+                            {{ form.location(class="form-control") }}
+                            {% if form.location.errors %}
+                                {% for error in form.location.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.cost.label(class="form-label") }}
+                            {{ form.cost(class="form-control") }}
+                            {% if form.cost.errors %}
+                                {% for error in form.cost.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('main.itinerary_detail', itinerary_id=itinerary.id) }}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i> Add Activity
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date to itinerary start date and maximum to end date
+    const dateInput = document.getElementById('date');
+    if (dateInput) {
+        dateInput.min = "{{ itinerary.start_date.strftime('%Y-%m-%d') }}";
+        dateInput.max = "{{ itinerary.end_date.strftime('%Y-%m-%d') }}";
+    }
+});
+</script>
+{% endblock %} 

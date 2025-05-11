@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}{{ holiday.title }} - Xpedition{% endblock %}
+
+{% block content %}
+<div class="holiday-view-container">
+    <div class="holiday-header">
+        <h1>{{ holiday.title }}</h1>
+        <div class="holiday-actions">
+            <a href="{{ url_for('protected.dashboard') }}" class="button secondary">Back to Dashboard</a>
+            <a href="#" class="button primary">Edit Holiday</a>
+        </div>
+    </div>
+
+    <div class="holiday-details">
+        <div class="detail-card">
+            <h2>Destination</h2>
+            <p>{{ holiday.destination }}</p>
+        </div>
+
+        <div class="detail-card">
+            <h2>Dates</h2>
+            <p>From: {{ holiday.start_date.strftime('%d %B %Y') }}</p>
+            <p>To: {{ holiday.end_date.strftime('%d %B %Y') }}</p>
+        </div>
+
+        <div class="detail-card">
+            <h2>Budget</h2>
+            <p>£{{ "%.2f"|format(holiday.budget) }}</p>
+        </div>
+
+        {% if holiday.description %}
+        <div class="detail-card full-width">
+            <h2>Description</h2>
+            <p>{{ holiday.description }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="holiday-sections">
+        <section class="activities-section">
+            <h2>Activities</h2>
+            {% if holiday.activities %}
+                <ul class="activities-list">
+                    {% for activity in holiday.activities %}
+                        <li>{{ activity.name }} - {{ activity.date.strftime('%d %B %Y') }}</li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No activities planned yet.</p>
+            {% endif %}
+            <a href="#" class="button secondary">Add Activity</a>
+        </section>
+    </div>
+</div>
+{% endblock %} 

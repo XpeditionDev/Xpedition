@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Search Results{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Activity Search Results</h1>
+    
+    <div class="mb-4">
+        <div class="card">
+            <div class="card-header">
+                <h5>Search Parameters</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <p><strong>Location:</strong> {{ search_params.location }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Date:</strong> {{ search_params.activity_date }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Activity Type:</strong> {{ search_params.activity_type or 'Any' }}</p>
+                    </div>
+                    <div class="col-md-3">
+                        <p><strong>Participants:</strong> {{ search_params.participants }}</p>
+                    </div>
+                </div>
+                <div class="text-end">
+                    <a href="{{ url_for('search.activity_search') }}" class="btn btn-outline-secondary">Modify Search</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for activity in activities %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-{{ activity.type }}">
+                    <span class="badge bg-info float-end">{{ activity.type|title }}</span>
+                    <h5 class="card-title">{{ activity.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">{{ activity.description }}</p>
+                    <ul class="list-group list-group-flush mb-3">
+                        <li class="list-group-item">
+                            <i class="fas fa-map-marker-alt"></i> {{ activity.location }}
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-clock"></i> Duration: {{ activity.duration }}
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-users"></i> Max participants: {{ activity.max_participants }}
+                        </li>
+                        <li class="list-group-item">
+                            <i class="fas fa-star"></i> Rating: {{ activity.rating }}/5
+                        </li>
+                    </ul>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">£{{ activity.price }}</h5>
+                        <div>
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#activityModal{{ loop.index }}">
+                                View Details
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Activity Details Modal -->
+        <div class="modal fade" id="activityModal{{ loop.index }}" tabindex="-1" aria-labelledby="activityModalLabel{{ loop.index }}" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="activityModalLabel{{ loop.index }}">{{ activity.name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <h6>Description</h6>
+                                <p>{{ activity.description }}</p>
+                                
+                                <h6>Details</h6>
+                                <ul class="list-group list-group-flush mb-3">
+                                    <li class="list-group-item">
+                                        <i class="fas fa-map-marker-alt"></i> Location: {{ activity.location }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-calendar"></i> Date: {{ search_params.activity_date }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-clock"></i> Duration: {{ activity.duration }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-users"></i> Max participants: {{ activity.max_participants }}
+                                    </li>
+                                    <li class="list-group-item">
+                                        <i class="fas fa-star"></i> Rating: {{ activity.rating }}/5
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-header">
+                                        <h6>Price Summary</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        <p><strong>Price per person:</strong> £{{ activity.price }}</p>
+                                        <p><strong>Number of participants:</strong> {{ search_params.participants }}</p>
+                                        <hr>
+                                        <h5>Total: £{{ activity.price * search_params.participants }}</h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#bookActivityModal{{ loop.index }}">Book Now</button>
+                        {% if current_user.is_authenticated %}
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#saveToItineraryModal{{ loop.index }}">
+                            Save to Itinerary
+                        </button>
+                        {% else %}
+                        <a href="{{ url_for('auth.login') }}" class="btn btn-primary">Log in to Save</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Book Activity Modal -->
+        <div class="modal fade" id="bookActivityModal{{ loop.index }}" tabindex="-1" aria-labelledby="bookActivityModalLabel{{ loop.index }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="bookActivityModalLabel{{ loop.index }}">Book {{ activity.name }}</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="bookActivityForm{{ loop.index }}" action="{{ url_for('search.book_activity') }}" method="POST">
+                            <!-- Store individual activity fields instead of JSON -->
+                            <input type="hidden" name="activity_name" value="{{ activity.name }}">
+                            <input type="hidden" name="activity_description" value="{{ activity.description }}">
+                            <input type="hidden" name="activity_location" value="{{ activity.location }}">
+                            <input type="hidden" name="activity_price" value="{{ activity.price }}">
+                            <input type="hidden" name="activity_currency" value="{{ activity.currency }}">
+                            <input type="hidden" name="activity_duration" value="{{ activity.duration }}">
+                            <input type="hidden" name="activity_type" value="{{ activity.type }}">
+                            <input type="hidden" name="activity_rating" value="{{ activity.rating }}">
+                            <input type="hidden" name="activity_max_participants" value="{{ activity.max_participants }}">
+                            <input type="hidden" name="activity_date" value="{{ search_params.activity_date }}">
+                            
+                            <div class="mb-3">
+                                <label for="participant_count{{ loop.index }}" class="form-label">Number of Participants</label>
+                                <input type="number" class="form-control" id="participant_count{{ loop.index }}" name="participant_count" 
+                                       min="1" max="{{ activity.max_participants }}" value="{{ search_params.participants }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="booker_name{{ loop.index }}" class="form-label">Your Name</label>
+                                <input type="text" class="form-control" id="booker_name{{ loop.index }}" name="booker_name" 
+                                       required value="{{ current_user.username if current_user.is_authenticated else '' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="booker_email{{ loop.index }}" class="form-label">Email</label>
+                                <input type="email" class="form-control" id="booker_email{{ loop.index }}" name="booker_email" 
+                                       required value="{{ current_user.email if current_user.is_authenticated else '' }}">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="special_requests{{ loop.index }}" class="form-label">Special Requests</label>
+                                <textarea class="form-control" id="special_requests{{ loop.index }}" name="special_requests" rows="3"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" form="bookActivityForm{{ loop.index }}" class="btn btn-success">Confirm Booking</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Save to Itinerary Modal -->
+        {% if current_user.is_authenticated %}
+        <div class="modal fade" id="saveToItineraryModal{{ loop.index }}" tabindex="-1" aria-labelledby="saveToItineraryModalLabel{{ loop.index }}" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="saveToItineraryModalLabel{{ loop.index }}">Save to Itinerary</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="saveToItineraryForm{{ loop.index }}" action="{{ url_for('search.save_activity_to_itinerary') }}" method="POST">
+                            <!-- Store individual activity fields instead of JSON -->
+                            <input type="hidden" name="activity_name" value="{{ activity.name }}">
+                            <input type="hidden" name="activity_description" value="{{ activity.description }}">
+                            <input type="hidden" name="activity_location" value="{{ activity.location }}">
+                            <input type="hidden" name="activity_price" value="{{ activity.price }}">
+                            <input type="hidden" name="activity_currency" value="{{ activity.currency }}">
+                            <input type="hidden" name="activity_duration" value="{{ activity.duration }}">
+                            <input type="hidden" name="activity_type" value="{{ activity.type }}">
+                            <input type="hidden" name="activity_rating" value="{{ activity.rating }}">
+                            <input type="hidden" name="activity_max_participants" value="{{ activity.max_participants }}">
+                            
+                            <div class="mb-3">
+                                <label for="itinerary_id{{ loop.index }}" class="form-label">Select Itinerary</label>
+                                <select class="form-control" id="itinerary_id{{ loop.index }}" name="itinerary_id" required>
+                                    {% if user_itineraries %}
+                                        {% for itinerary in user_itineraries %}
+                                        <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                                        {% endfor %}
+                                        <option value="new">Create New Itinerary</option>
+                                    {% else %}
+                                        <option value="new" selected>Create New Itinerary</option>
+                                    {% endif %}
+                                </select>
+                            </div>
+                            
+                            <div class="mb-3 new-itinerary-fields{{ loop.index }}" style="{% if user_itineraries %}display: none;{% endif %}">
+                                <label for="new_itinerary_name{{ loop.index }}" class="form-label">New Itinerary Name</label>
+                                <input type="text" class="form-control" id="new_itinerary_name{{ loop.index }}" name="new_itinerary_name">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="activity_date{{ loop.index }}" class="form-label">Activity Date</label>
+                                <input type="date" class="form-control" id="activity_date{{ loop.index }}" name="activity_date" 
+                                       value="{{ search_params.activity_date }}" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="start_time{{ loop.index }}" class="form-label">Start Time</label>
+                                <input type="time" class="form-control" id="start_time{{ loop.index }}" name="start_time" required>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" form="saveToItineraryForm{{ loop.index }}" class="btn btn-primary">Save Activity</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% for activity in activities %}
+    // Handle new itinerary fields toggle for each activity
+    const itinerarySelect{{ loop.index }} = document.getElementById('itinerary_id{{ loop.index }}');
+    const newItineraryFields{{ loop.index }} = document.querySelector('.new-itinerary-fields{{ loop.index }}');
+    
+    if (itinerarySelect{{ loop.index }}) {
+        itinerarySelect{{ loop.index }}.addEventListener('change', function() {
+            if (this.value === 'new') {
+                newItineraryFields{{ loop.index }}.style.display = 'block';
+                document.getElementById('new_itinerary_name{{ loop.index }}').setAttribute('required', true);
+            } else {
+                newItineraryFields{{ loop.index }}.style.display = 'none';
+                document.getElementById('new_itinerary_name{{ loop.index }}').removeAttribute('required');
+            }
+        });
+    }
+    {% endfor %}
+});
+</script>
+{% endblock %} 

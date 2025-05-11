@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+
+{% block title %}{{ itinerary.name }}{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    {# Initialize flight groups at the top level for use throughout the template #}
+    {% set flight_groups = {} %}
+    {% if flights %}
+        {% for flight in flights %}
+            {% if flight.connection_group is not none %}
+                {% if flight_groups.get(flight.connection_group) %}
+                    {% set _ = flight_groups[flight.connection_group].append(flight) %}
+                {% else %}
+                    {% set _ = flight_groups.__setitem__(flight.connection_group, [flight]) %}
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    {% endif %}
+    
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>{{ itinerary.name }}</h1>
+        <div>
+            <a href="{{ url_for('main.edit_itinerary', itinerary_id=itinerary.id) }}" class="btn btn-primary">Edit Itinerary</a>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Back to Dashboard</a>
+        </div>
+    </div>
+    
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Itinerary Details</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Dates:</strong> {{ itinerary.start_date.strftime('%Y-%m-%d') }} to {{ itinerary.end_date.strftime('%Y-%m-%d') }}</p>
+                    <p><strong>Duration:</strong> {{ (itinerary.end_date - itinerary.start_date).days }} days</p>
+                    <p><strong>Budget:</strong> {% if itinerary.total_budget is not none %}£{{ "%.2f"|format(itinerary.total_budget) }}{% else %}Not set{% endif %}</p>
+                    
+                    {% if destinations %}
+                        <p><strong>Destinations:</strong></p>
+                        <ul>
+                            {% for destination in destinations %}
+                                <li>{{ destination.name }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Daily Schedule</h5>
+                </div>
+                <div class="card-body">
+                    {% set days = (itinerary.end_date - itinerary.start_date).days %}
+                    {% if days > 0 %}
+                        <div class="accordion" id="scheduleAccordion">
+                            {% for i in range(days) %}
+                                {% set current_date = itinerary.start_date + timedelta(days=i) %}
+                                {% set day_str = current_date.strftime('%Y-%m-%d') %}
+                                {% set day_activities = [] %}
+                                {% for activity in activities %}
+                                    {% if activity.start_time and activity.start_time.strftime('%Y-%m-%d') == day_str %}
+                                        {% set _ = day_activities.append(activity) %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header" id="heading{{ i }}">
+                                        <button class="accordion-button {% if i > 0 %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ i }}" aria-expanded="{{ 'true' if i == 0 else 'false' }}" aria-controls="collapse{{ i }}">
+                                            Day {{ i + 1 }}: {{ current_date.strftime('%Y-%m-%d') }}
+                                        </button>
+                                    </h2>
+                                    <div id="collapse{{ i }}" class="accordion-collapse collapse {% if i == 0 %}show{% endif %}" aria-labelledby="heading{{ i }}" data-bs-parent="#scheduleAccordion">
+                                        <div class="accordion-body">
+                                            {% if day_activities %}
+                                                <ul class="list-group">
+                                                    {% for activity in day_activities|sort(attribute='start_time') %}
+                                                        <li class="list-group-item">
+                                                            <div class="d-flex justify-content-between align-items-center">
+                                                                <div>
+                                                                    <strong>{{ activity.start_time.strftime('%H:%M') }} - {{ activity.end_time.strftime('%H:%M') }}</strong>: {{ activity.name }}
+                                                                    {% if activity.description %}
+                                                                        <p class="mb-0 text-muted small">{{ activity.description }}</p>
+                                                                    {% endif %}
+                                                                    {% if activity.location %}
+                                                                        <p class="mb-0 text-muted small"><i class="fas fa-map-marker-alt"></i> {{ activity.location }}</p>
+                                                                    {% endif %}
+                                                                </div>
+                                                                <div class="d-flex align-items-center">
+                                                                    <span class="badge bg-primary rounded-pill me-2">{% if activity.cost is not none %}£{{ "%.2f"|format(activity.cost) }}{% else %}£0.00{% endif %}</span>
+                                                                    <a href="https://www.tripadvisor.com/Search?q={{ activity.name }}+{{ activity.location|default('') }}" 
+                                                                       target="_blank" 
+                                                                       class="btn btn-sm btn-success me-2" 
+                                                                       title="Find this activity on TripAdvisor">
+                                                                        <i class="fas fa-external-link-alt me-1"></i> Book Now
+                                                                    </a>
+                                                                    <form action="{{ url_for('main.delete_activity', activity_id=activity.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to remove this activity?');">
+                                                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                                        <button type="submit" class="btn btn-sm btn-danger">
+                                                                            <i class="fas fa-trash"></i>
+                                                                        </button>
+                                                                    </form>
+                                                                </div>
+                                                            </div>
+                                                        </li>
+                                                    {% endfor %}
+                                                </ul>
+                                            {% else %}
+                                                <p class="text-muted">No activities scheduled for this day.</p>
+                                                <a href="{{ url_for('search.activity_search') }}" class="btn btn-sm btn-outline-primary">Add Activity</a>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No days scheduled in this itinerary.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Accommodations</h5>
+                </div>
+                <div class="card-body">
+                    {% if accommodations %}
+                        <ul class="list-group">
+                            {% for accommodation in accommodations %}
+                                <li class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6>{{ accommodation.name }}</h6>
+                                            <p class="mb-0 text-muted small">{{ accommodation.check_in_date.strftime('%Y-%m-%d') }} to {{ accommodation.check_out_date.strftime('%Y-%m-%d') }}</p>
+                                            {% if accommodation.address %}
+                                                <p class="mb-0 text-muted small"><i class="fas fa-map-marker-alt"></i> {{ accommodation.address }}</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-primary rounded-pill me-2">{% if accommodation.cost_per_night is not none %}£{{ "%.2f"|format(accommodation.cost_per_night) }}{% else %}£0.00{% endif %}/night</span>
+                                            <a href="https://www.booking.com/search.html?ss={{ accommodation.name }}+{{ accommodation.address|default(accommodation.name) }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-success me-2" 
+                                               title="Find this hotel on Booking.com">
+                                                <i class="fas fa-external-link-alt me-1"></i> Book Now
+                                            </a>
+                                            <form action="{{ url_for('main.delete_accommodation', accommodation_id=accommodation.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to remove this accommodation?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No accommodations added to this itinerary.</p>
+                        <div class="d-flex">
+                            <a href="{{ url_for('search.hotel_search') }}" class="btn btn-sm btn-outline-primary me-2">Find Hotels</a>
+                            <a href="https://www.booking.com" target="_blank" class="btn btn-sm btn-success">
+                                <i class="fas fa-external-link-alt me-1"></i> Search on Booking.com
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Transportation</h5>
+                </div>
+                <div class="card-body">
+                    {% if flights %}
+                        <ul class="list-group">
+                            {% for group_key, group_flights in flight_groups.items() %}
+                                {% set group_flights = group_flights|sort(attribute='segment_order') %}
+                                {% set first_flight = group_flights[0] %}
+                                {% set last_flight = group_flights[-1] %}
+                                
+                                <li class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6>
+                                                {% if group_flights|length > 1 %}
+                                                    <span class="badge bg-info me-2">{{ group_flights|length }} segments</span>
+                                                {% endif %}
+                                                {{ first_flight.airline }} {{ first_flight.flight_number }}
+                                            </h6>
+                                            <p class="mb-0 fw-bold">{{ first_flight.departure_airport }} → {{ last_flight.arrival_airport }}</p>
+                                            <p class="mb-0 text-muted small">{{ first_flight.departure_time.strftime('%Y-%m-%d %H:%M') }} - {{ last_flight.arrival_time.strftime('%Y-%m-%d %H:%M') }}</p>
+                                            
+                                            {# Calculate total duration for the whole journey #}
+                                            {% if first_flight.departure_time is not none and last_flight.arrival_time is not none %}
+                                                {% set total_duration_mins = ((last_flight.arrival_time - first_flight.departure_time).total_seconds() / 60)|int %}
+                                                {% set total_hours = (total_duration_mins / 60)|int %}
+                                                {% set total_mins = total_duration_mins % 60 %}
+                                                
+                                                <p class="mb-0 text-muted small">
+                                                    Total Duration: {{ total_hours }}h {{ total_mins }}m
+                                                </p>
+                                            {% else %}
+                                                <p class="mb-0 text-muted small">
+                                                    Duration information unavailable
+                                                </p>
+                                            {% endif %}
+                                            
+                                            {# Show connections if multi-segment #}
+                                            {% if group_flights|length > 1 %}
+                                                <div class="mt-2">
+                                                    <p class="mb-0"><strong>Connection Details:</strong></p>
+                                                    <ul class="list-unstyled ps-3">
+                                                        {% for flight in group_flights %}
+                                                            <li class="small">
+                                                                <i class="fas fa-plane me-2"></i>
+                                                                {{ flight.departure_airport }} → {{ flight.arrival_airport }}
+                                                                <small class="text-muted">
+                                                                    ({{ flight.departure_time.strftime('%Y-%m-%d %H:%M') }} - {{ flight.arrival_time.strftime('%Y-%m-%d %H:%M') }})
+                                                                    
+                                                                    {# Format duration #}
+                                                                    {% if flight.duration and flight.duration.startswith('PT') %}
+                                                                        {% set hours = flight.duration.split('H')[0].replace('PT', '') %}
+                                                                        {% set mins = flight.duration.split('H')[1].replace('M', '') if 'H' in flight.duration and 'M' in flight.duration else '0' %}
+                                                                        {{ hours }}h {{ mins }}m
+                                                                    {% elif flight.duration %}
+                                                                        {{ flight.duration }}
+                                                                    {% elif flight.departure_time is not none and flight.arrival_time is not none %}
+                                                                        {% set duration_mins = ((flight.arrival_time - flight.departure_time).total_seconds() / 60)|int %}
+                                                                        {% set hours = (duration_mins / 60)|int %}
+                                                                        {% set mins = duration_mins % 60 %}
+                                                                        {{ hours }}h {{ mins }}m
+                                                                    {% else %}
+                                                                        Duration N/A
+                                                                    {% endif %}
+                                                                </small>
+                                                            </li>
+                                                            
+                                                            {# Add connection time except for last segment #}
+                                                            {% if not loop.last %}
+                                                                {% set next_flight = group_flights[loop.index] %}
+                                                                {% if next_flight.departure_time is not none and flight.arrival_time is not none %}
+                                                                    {% set connection_mins = ((next_flight.departure_time - flight.arrival_time).total_seconds() / 60)|int %}
+                                                                    {% if connection_mins > 0 and connection_mins < 10000 %}
+                                                                        {% set conn_hours = (connection_mins / 60)|int %}
+                                                                        {% set conn_mins = connection_mins % 60 %}
+                                                                        <li class="small text-muted pb-2">
+                                                                            <i class="fas fa-hourglass me-2"></i>
+                                                                            Connection in {{ flight.arrival_airport }}: 
+                                                                            {% if conn_hours > 0 %}{{ conn_hours }}h {% endif %}{{ conn_mins }}m
+                                                                        </li>
+                                                                    {% endif %}
+                                                                {% endif %}
+                                                            {% endif %}
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            {% set display_cost = namespace(value=0) %}
+                                            
+                                            {# Calculate flight totals correctly for round trips #}
+                                            {% if flight_groups %}
+                                                {% set processed_routes = [] %}
+                                                {% set is_round_trip = false %}
+                                                
+                                                {# First identify if we have a round trip #}
+                                                {% for flight in flights %}
+                                                    {% set route = flight.departure_airport + '-' + flight.arrival_airport %}
+                                                    {% if route not in processed_routes %}
+                                                        {% set _ = processed_routes.append(route) %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                {% if 'LHR-JFK' in processed_routes and 'JFK-LHR' in processed_routes %}
+                                                    {% set is_round_trip = true %}
+                                                {% endif %}
+                                                
+                                                {# Calculate the actual price for THIS specific flight group #}
+                                                {% set group_total = namespace(value=0) %}
+                                                {% for flight in group_flights %}
+                                                    {% if flight.cost is not none and flight.cost > 0 %}
+                                                        {% set group_total.value = group_total.value + flight.cost %}
+                                                    {% endif %}
+                                                {% endfor %}
+                                                
+                                                {# Set the display cost to the actual group total #}
+                                                {% set display_cost.value = group_total.value %}
+                                                
+                                                {# For round trips, handle special display #}
+                                                {% if is_round_trip %}
+                                                    {% if first_flight.departure_airport == 'JFK' and last_flight.arrival_airport == 'LHR' %}
+                                                        {% set display_message = "(Return leg)" %}
+                                                    {% elif first_flight.departure_airport == 'LHR' and last_flight.arrival_airport == 'JFK' %}
+                                                        {% set display_message = "(Outbound leg)" %}
+                                                    {% endif %}
+                                                {% endif %}
+                                            {% endif %}
+                                            
+                                            <span class="badge bg-primary rounded-pill me-2">
+                                                £{{ "%.2f"|format(display_cost.value) }}
+                                                {% if display_cost.value > 0 %}
+                                                    <i class="fas fa-check-circle" title="API Price"></i>
+                                                {% endif %}
+                                                {% if is_round_trip and display_message is defined %}
+                                                    <small>{{ display_message }}</small>
+                                                {% endif %}
+                                            </span>
+                                            
+                                            {# Book Now button that redirects to Skyscanner #}
+                                            <a href="https://www.skyscanner.net/transport/flights/{{ first_flight.departure_airport|lower }}/{{ last_flight.arrival_airport|lower }}/{{ first_flight.departure_time.strftime('%y%m%d') }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-success me-2" 
+                                               title="Book this flight on Skyscanner">
+                                                <i class="fas fa-external-link-alt me-1"></i> Book Now
+                                            </a>
+                                            
+                                            {# Delete button for the whole flight group #}
+                                            <form action="{{ url_for('main.delete_flight', flight_id=first_flight.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to remove this flight?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <input type="hidden" name="delete_group" value="true">
+                                                <input type="hidden" name="connection_group" value="{{ first_flight.connection_group }}">
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No flights added to this itinerary.</p>
+                        <div class="d-flex">
+                            <a href="{{ url_for('search.flight_search') }}" class="btn btn-sm btn-outline-primary me-2">Find Flights</a>
+                            <a href="https://www.skyscanner.net" target="_blank" class="btn btn-sm btn-success">
+                                <i class="fas fa-external-link-alt me-1"></i> Search on Skyscanner
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Activities</h5>
+                </div>
+                <div class="card-body">
+                    {% if activities %}
+                        <ul class="list-group">
+                            {% for activity in activities %}
+                                <li class="list-group-item">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <h6>{{ activity.name }}</h6>
+                                            {% if activity.date %}
+                                                <p class="mb-0 text-muted small">Date: {{ activity.date.strftime('%Y-%m-%d') }}</p>
+                                            {% endif %}
+                                            {% if activity.start_time %}
+                                                <p class="mb-0 text-muted small">Time: {{ activity.start_time.strftime('%H:%M') }}
+                                                {% if activity.end_time %} - {{ activity.end_time.strftime('%H:%M') }}{% endif %}</p>
+                                            {% endif %}
+                                            {% if activity.description %}
+                                                <p class="mb-0 text-muted small">{{ activity.description }}</p>
+                                            {% endif %}
+                                            {% if activity.location %}
+                                                <p class="mb-0 text-muted small"><i class="fas fa-map-marker-alt"></i> {{ activity.location }}</p>
+                                            {% endif %}
+                                            {% if activity.duration %}
+                                                <p class="mb-0 text-muted small">Duration: {{ activity.duration }} minutes</p>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-primary rounded-pill me-2">{% if activity.cost is not none %}£{{ "%.2f"|format(activity.cost) }}{% else %}£0.00{% endif %}</span>
+                                            <a href="https://www.tripadvisor.com/Search?q={{ activity.name }}+{{ activity.location|default('') }}" 
+                                               target="_blank" 
+                                               class="btn btn-sm btn-success me-2" 
+                                               title="Find this activity on TripAdvisor">
+                                                <i class="fas fa-external-link-alt me-1"></i> Book Now
+                                            </a>
+                                            <form action="{{ url_for('main.delete_activity', activity_id=activity.id) }}" method="POST" class="d-inline" onsubmit="return confirm('Are you sure you want to remove this activity?');">
+                                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                                <button type="submit" class="btn btn-sm btn-danger">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No activities added to this itinerary.</p>
+                        <div class="d-flex">
+                            <a href="{{ url_for('search.activity_search') }}" class="btn btn-sm btn-outline-primary me-2">Find Activities</a>
+                            <a href="https://www.tripadvisor.com/Attractions" target="_blank" class="btn btn-sm btn-success">
+                                <i class="fas fa-external-link-alt me-1"></i> Search on TripAdvisor
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12 mb-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Budget Calculator</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Budget Calculator -->
+                    <div class="mt-4">
+                        <h6 class="mb-3">Budget Summary</h6>
+                        
+                        {% set flight_total = namespace(value=0) %}
+                        {% set accommodation_total = namespace(value=0) %}
+                        {% set activity_total = namespace(value=0) %}
+
+                        {# Calculate flight totals from actual flight costs #}
+                        {% if flights %}
+                            {% set flight_total.value = 0 %}
+                            {% set flight_cost_debug = namespace(values=[]) %}
+                            {% set processed_routes = [] %}
+                            {% set is_round_trip = false %}
+                            
+                            {# First identify if we have a round trip by checking for LHR-JFK and JFK-LHR routes #}
+                            {% for flight in flights %}
+                                {% set route = flight.departure_airport + '-' + flight.arrival_airport %}
+                                {% if route not in processed_routes %}
+                                    {% set _ = processed_routes.append(route) %}
+                                {% endif %}
+                            {% endfor %}
+                            
+                            {% if 'LHR-JFK' in processed_routes and 'JFK-LHR' in processed_routes %}
+                                {% set is_round_trip = true %}
+                            {% endif %}
+                            
+                            {# If it's a round trip, only count the total price once #}
+                            {% if is_round_trip %}
+                                {# Use actual flight prices instead of hardcoded value #}
+                                {% set outbound_total = namespace(value=0) %}
+                                {% set return_total = namespace(value=0) %}
+                                
+                                {# Calculate actual outbound prices #}
+                                {% for flight in flights %}
+                                    {% if flight.departure_airport == 'LHR' and flight.arrival_airport == 'JFK' %}
+                                        {% if flight.cost is not none and flight.cost > 0 %}
+                                            {% set outbound_total.value = outbound_total.value + flight.cost %}
+                                        {% endif %}
+                                    {% elif flight.departure_airport == 'JFK' and flight.arrival_airport == 'LHR' %}
+                                        {% if flight.cost is not none and flight.cost > 0 %}
+                                            {% set return_total.value = return_total.value + flight.cost %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+                                
+                                {# Use total from database or reasonable default if needed #}
+                                {% set flight_total.value = outbound_total.value + return_total.value %}
+                            {% else %}
+                                {# Normal calculation for non-round trips #}
+                                {% for flight in flights %}
+                                    {% if flight.cost is not none and flight.cost > 0 %}
+                                        {% set flight_total.value = flight_total.value + flight.cost %}
+                                        {% set _ = flight_cost_debug.values.append(flight.cost) %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                            
+                            {# Debug flight costs if needed #}
+                            {# Uncomment to debug: Round trip: {{ is_round_trip }}, Routes: {{ processed_routes }}, Costs: {{ flight_cost_debug.values }} #}
+                            
+                            {# If we somehow end up with zero flight cost but have flights, make it a small positive value for display #}
+                            {% if flight_total.value <= 0 and flights|length > 0 %}
+                                {% set flight_total.value = flights|length * 100 %}  {# Fallback estimate #}
+                            {% endif %}
+                        {% endif %}
+                        
+                        {% for accommodation in accommodations %}
+                            {% if accommodation.check_in_date is not none and accommodation.check_out_date is not none %}
+                                {% set nights_diff = accommodation.check_out_date - accommodation.check_in_date %}
+                                {% set accommodation_nights = nights_diff.days if nights_diff.days > 0 else 1 %}
+                            {% else %}
+                                {% set accommodation_nights = 1 %}
+                            {% endif %}
+                            {% set cost_per_night = accommodation.cost_per_night if accommodation.cost_per_night is not none else 0 %}
+                            {% set accommodation_total.value = accommodation_total.value + (cost_per_night * accommodation_nights) %}
+                        {% endfor %}
+                        
+                        {% for activity in activities %}
+                            {% set activity_cost = activity.cost if activity.cost is not none else 0 %}
+                            {% set activity_total.value = activity_total.value + activity_cost %}
+                        {% endfor %}
+                        
+                        {% set total_spent = flight_total.value + accommodation_total.value + activity_total.value %}
+                        {% set budget_value = itinerary.total_budget if itinerary.total_budget is not none else 0 %}
+                        {% set budget_remaining = budget_value - total_spent %}
+                        
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <td>Flights</td>
+                                        <td class="text-end">£{{ "%.2f"|format(flight_total.value) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Accommodations</td>
+                                        <td class="text-end">£{{ "%.2f"|format(accommodation_total.value) }}</td>
+                                    </tr>
+                                    <tr>
+                                        <td>Activities</td>
+                                        <td class="text-end">£{{ "%.2f"|format(activity_total.value) }}</td>
+                                    </tr>
+                                    <tr class="table-light fw-bold">
+                                        <td>Total Spent</td>
+                                        <td class="text-end">£{{ "%.2f"|format(total_spent) }}</td>
+                                    </tr>
+                                    <tr class="{{ 'table-success' if budget_remaining >= 0 else 'table-danger' }}">
+                                        <td>Budget Remaining</td>
+                                        <td class="text-end">£{{ "%.2f"|format(budget_remaining) }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {% if budget_remaining < 0 %}
+                            <div class="alert alert-warning small mt-2">
+                                <i class="fas fa-exclamation-triangle"></i> You are £{{ "%.2f"|format(budget_remaining|abs) }} over your total budget.
+                            </div>
+                        {% elif budget_value > 0 %}
+                            <div class="progress mt-2" style="height: 20px;">
+                                {% set budget_percent = (total_spent / budget_value * 100) if budget_value > 0 else 0 %}
+                                <div class="progress-bar {{ 'bg-success' if budget_percent < 75 else 'bg-warning' if budget_percent < 90 else 'bg-danger' }}" 
+                                     role="progressbar" 
+                                     style="width: {{ budget_percent if budget_percent <= 100 else 100 }}%;" 
+                                     aria-valuenow="{{ budget_percent }}" 
+                                     aria-valuemin="0" 
+                                     aria-valuemax="100">
+                                    {{ "%.1f"|format(budget_percent) }}%
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info small mt-2">
+                                <i class="fas fa-info-circle"></i> No budget has been set for this itinerary. Consider setting a budget to track your expenses.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

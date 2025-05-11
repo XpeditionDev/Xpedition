@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0"><i class="fas fa-list me-2"></i>Flight Results</h3>
+                    <p class="mb-0">
+                        {{ search_params.origin }} to {{ search_params.destination }}
+                        ({{ search_params.departure_date }}{% if search_params.return_date %} - {{ search_params.return_date }}{% endif %})
+                    </p>
+                </div>
+                <div class="card-body">
+                    {% if flights.status == 'success' and flights.flights|length > 0 %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Type</th>
+                                        <th>Airline</th>
+                                        <th>Flight</th>
+                                        <th>Departure</th>
+                                        <th>Arrival</th>
+                                        <th>Duration</th>
+                                        <th>Price</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for flight in flights.flights %}
+                                    <tr>
+                                        <td>
+                                            {% if flight.segments|length == 1 %}
+                                                <span class="badge bg-success">Direct</span>
+                                            {% else %}
+                                                <span class="badge bg-warning">Connection</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ flight.segments[0].carrierCode }}</td>
+                                        <td>{{ flight.segments[0].number }}</td>
+                                        <td>
+                                            <strong>{{ flight.segments[0].departure.iataCode }}</strong>
+                                            <br>
+                                            <small>{{ flight.segments[0].departure.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                        </td>
+                                        <td>
+                                            <strong>{{ flight.segments[0].arrival.iataCode }}</strong>
+                                            <br>
+                                            <small>{{ flight.segments[0].arrival.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                        </td>
+                                        <td>{{ flight.segments[0].duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</td>
+                                        <td>
+                                            <strong class="text-success">
+                                                {{ flight.price.currency }} {{ flight.price.total }}
+                                            </strong>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('main.book_flight', flight_id=flight.id) }}" class="btn btn-sm btn-primary">
+                                                Save to Itinerary
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% if flight.segments|length > 1 %}
+                                        {% for segment in flight.segments[1:] %}
+                                        <tr class="table-light">
+                                            <td colspan="2"></td>
+                                            <td>{{ segment.number }}</td>
+                                            <td>
+                                                <strong>{{ segment.departure.iataCode }}</strong>
+                                                <br>
+                                                <small>{{ segment.departure.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                            </td>
+                                            <td>
+                                                <strong>{{ segment.arrival.iataCode }}</strong>
+                                                <br>
+                                                <small>{{ segment.arrival.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                            </td>
+                                            <td>{{ segment.duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</td>
+                                            <td colspan="2"></td>
+                                        </tr>
+                                        {% endfor %}
+                                    {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i>No flights found for your search criteria. Please try different dates or destinations.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

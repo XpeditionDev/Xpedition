@@ -1,0 +1,750 @@
+import random
+import os
+import pickle
+from datetime import datetime, timedelta
+from app.models import Destination
+from app.models import Itinerary, Activity, Accommodation, Flight
+from app import db
+from .recommendation_model import DestinationRecommender
+from .price_predictor import PricePredictor
+from .api_client import MockApiClient
+from .itinerary_generator import ItineraryNeuralNetwork
+import uuid
+
+# Path to save data files
+MODEL_PATH = os.path.join(os.path.dirname(__file__), 'ai_models')
+if not os.path.exists(MODEL_PATH):
+    os.makedirs(MODEL_PATH)
+
+# Sample destination data
+DESTINATIONS = [
+    {
+        "name": "London",
+        "description": "The capital city of the United Kingdom",
+        "airport_code": "LHR",
+        "interests": ["culture", "museums", "history", "shopping", "food"]
+    },
+    {
+        "name": "Paris",
+        "description": "The capital city of France",
+        "airport_code": "CDG",
+        "interests": ["art", "romance", "food", "culture", "architecture"]
+    },
+    {
+        "name": "New York",
+        "description": "The city that never sleeps",
+        "airport_code": "JFK",
+        "interests": ["urban", "shopping", "art", "food", "architecture"]
+    },
+    {
+        "name": "Rome",
+        "description": "The capital city of Italy",
+        "airport_code": "FCO",
+        "interests": ["history", "architecture", "food", "religion", "art"]
+    },
+    {
+        "name": "Tokyo",
+        "description": "The capital city of Japan",
+        "airport_code": "HND",
+        "interests": ["technology", "food", "shopping", "culture", "modern"]
+    },
+    {
+        "name": "Barcelona",
+        "description": "A vibrant city in Spain",
+        "airport_code": "BCN",
+        "interests": ["architecture", "beach", "food", "nightlife", "art"]
+    }
+]
+
+# Major departure airports for generating mock flights
+DEPARTURE_AIRPORTS = ["LHR", "LGW", "MAN", "EDI", "BHX", "BRS", "GLA", "STN"]
+
+# Sample interests
+INTERESTS = [
+    "culture", "history", "art", "food", "shopping", "architecture", 
+    "beach", "nature", "adventure", "nightlife", "family-friendly"
+]
+
+# Sample activities for different destinations
+ACTIVITIES = {
+    "London": [
+        {
+            "name": "Tower of London Tour",
+            "description": "Explore the historic castle on the north bank of the River Thames",
+            "cost": 25.0,
+            "duration": 180,
+            "interests": ["history", "culture", "architecture"]
+        },
+        {
+            "name": "British Museum Visit",
+            "description": "Visit one of the world's most comprehensive museums of human history and culture",
+            "cost": 0.0,
+            "duration": 180,
+            "interests": ["history", "culture", "art"]
+        },
+        {
+            "name": "London Eye Experience",
+            "description": "Take a ride on the giant Ferris wheel for panoramic views of London",
+            "cost": 30.0,
+            "duration": 60,
+            "interests": ["architecture", "photography", "sightseeing"]
+        },
+        {
+            "name": "Buckingham Palace Tour",
+            "description": "Tour the official residence of the UK's sovereigns",
+            "cost": 20.0,
+            "duration": 120,
+            "interests": ["history", "architecture", "culture"]
+        },
+        {
+            "name": "Camden Market Shopping",
+            "description": "Shop at one of London's most popular open-air markets",
+            "cost": 0.0,
+            "duration": 180,
+            "interests": ["shopping", "food", "culture"]
+        }
+    ],
+    # Add other cities and their activities here
+}
+
+# Sample accommodations for different locations
+ACCOMMODATIONS = {
+    "London": [
+        {
+            "name": "The Savoy",
+            "description": "Luxury hotel in the heart of London",
+            "cost_per_night": 350.0,
+            "type": "hotel",
+            "location": "Strand, London"
+        },
+        {
+            "name": "Comfortable Apartment in Westminster",
+            "description": "Modern apartment close to major attractions",
+            "cost_per_night": 180.0,
+            "type": "apartment",
+            "location": "Westminster, London"
+        },
+        {
+            "name": "Budget Hostel",
+            "description": "Affordable accommodation for budget travelers",
+            "cost_per_night": 50.0,
+            "type": "hostel",
+            "location": "Kings Cross, London"
+        },
+        {
+            "name": "Cozy B&B in Notting Hill",
+            "description": "Charming bed and breakfast in a lovely neighborhood",
+            "cost_per_night": 120.0,
+            "type": "b&b",
+            "location": "Notting Hill, London"
+        }
+    ],
+    # Add other cities and their accommodations here
+}
+
+class ItineraryGenerator:
+    """
+    A class for generating AI-powered travel itineraries
+    """
+    
+    # Class attributes for mock data
+    DEPARTURE_AIRPORTS = DEPARTURE_AIRPORTS
+
+    def __init__(self):
+        self.destinations = DESTINATIONS
+        self.interests = INTERESTS
+        self.destination_recommender = DestinationRecommender()
+        self.flight_predictor = PricePredictor(model_type='flight')
+        self.hotel_predictor = PricePredictor(model_type='hotel')
+        self.mock_client = MockApiClient()
+        self.itinerary_nn = ItineraryNeuralNetwork()
+        print("Initialized AI planner with neural networks")
+    
+    def generate_itinerary(self, destination, duration_days, budget, interests_text, age=25, travel_style='standard'):
+        """
+        Generate an AI-powered itinerary based on user preferences
+        
+        Args:
+            destination (str): The destination name
+            duration_days (int): The duration of the trip in days
+            budget (float): The total budget for the trip
+            interests_text (str): Comma-separated list of interests
+            age (int, optional): The age of the traveler. Defaults to 25.
+            travel_style (str, optional): The travel style (budget, standard, luxury). Defaults to 'standard'.
+        """
+        # Clean and tokenize interests
+        interests_list = [interest.strip().lower() for interest in interests_text.split(',')]
+        
+        # Get destination recommendations if no specific destination provided
+        if not destination or destination.lower() not in self.destinations:
+            recommendations = self.destination_recommender.get_destination_recommendations({
+                'interests': interests_list,
+                'budget': budget,
+                'duration': duration_days,
+                'month': datetime.now().month
+            })
+            
+            # Use the top recommended destination
+            destination = recommendations[0]['name'].lower()
+            match_percentage = recommendations[0]['match_percentage']
+            print(f"AI recommended {destination.title()} with {match_percentage}% match")
+        
+        # Get the destination data
+        dest_data = self.destinations[destination]
+        
+        # Create itinerary base
+        itinerary = {
+            'name': f"{duration_days} Day Trip to {destination.title()}",
+            'destination': {
+                'name': destination.title(),
+                'country': dest_data['country'],
+                'description': f"A beautiful {duration_days}-day trip to {destination.title()}, {dest_data['country']}"
+            },
+            'start_date': datetime.now() + timedelta(days=30),
+            'end_date': datetime.now() + timedelta(days=30 + duration_days),
+            'total_budget': budget
+        }
+        
+        # Use price prediction for accommodations
+        accommodations = dest_data['accommodations']
+        for acc in accommodations:
+            predicted_price = self.hotel_predictor.predict_price({
+                'city': destination,
+                'check_in': itinerary['start_date'].strftime('%Y-%m-%d'),
+                'check_out': itinerary['end_date'].strftime('%Y-%m-%d'),
+                'star_rating': 4 if acc['type'] == 'luxury' else 3,
+                'breakfast_included': acc['type'] in ['luxury', 'hotel']
+            })
+            acc['predicted_price'] = predicted_price['predicted_price']
+        
+        # Select accommodation based on predicted prices and budget
+        daily_accommodation_budget = budget * 0.4 / duration_days
+        accommodations = sorted(accommodations, 
+                              key=lambda x: abs(x['predicted_price'] - daily_accommodation_budget))
+        selected_accommodation = accommodations[0]
+        
+        itinerary['accommodation'] = {
+            'name': selected_accommodation['name'],
+            'type': selected_accommodation['type'],
+            'cost_per_night': selected_accommodation['predicted_price'],
+            'total_cost': selected_accommodation['predicted_price'] * duration_days
+        }
+        
+        # Generate mock flights to and from the destination
+        outbound_flight, return_flight = self._generate_mock_flights(destination, itinerary['start_date'], itinerary['end_date'], budget)
+        itinerary['flights'] = [outbound_flight, return_flight]
+        
+        # Calculate flight costs
+        flight_cost = outbound_flight['cost'] + return_flight['cost']
+        
+        # Select activities based on interests and remaining budget
+        remaining_budget = budget - itinerary['accommodation']['total_cost'] - flight_cost
+        daily_activity_budget = remaining_budget / duration_days
+        
+        # Use neural network to score and select activities based on user preferences
+        user_preferences = {
+            'interests': interests_list,
+            'budget': budget,
+            'duration': duration_days,
+            'month': datetime.now().month,
+            'age': age,  # Use the provided age parameter
+            'travel_style': travel_style  # Use the provided travel style parameter
+        }
+        
+        # Get neural network recommendations for activities
+        nn_activities = self.itinerary_nn.generate_itinerary_activities(
+            user_preferences=user_preferences,
+            available_activities=dest_data['activities'],
+            num_activities=duration_days * 2  # 2 activities per day
+        )
+        
+        # Convert to the format expected by the rest of the code
+        selected_activities = []
+        activity_cost = 0
+        
+        # Extract activities from neural network recommendations
+        for activity_data in nn_activities:
+            selected_activities.append({
+                'name': activity_data['name'],
+                'cost': activity_data['cost'],
+                'duration': activity_data['duration'],
+                'category': activity_data['category']
+            })
+            activity_cost += activity_data['cost']
+        
+        for activity, score in scored_activities:
+            if activity_cost + activity['cost'] <= remaining_budget:
+                selected_activities.append(activity)
+                activity_cost += activity['cost']
+                if len(selected_activities) >= duration_days * 2:
+                    break
+        
+        # Organize activities by day
+        daily_activities = []
+        for i in range(duration_days):
+            day_activities = []
+            num_activities = min(2, len(selected_activities) - i*2)
+            for j in range(num_activities):
+                if i*2 + j < len(selected_activities):
+                    activity = selected_activities[i*2 + j]
+                    day_activities.append({
+                        'name': activity['name'],
+                        'cost': activity['cost'],
+                        'duration': activity['duration'],
+                        'category': activity['category'],
+                        'day': i + 1,
+                        'date': (itinerary['start_date'] + timedelta(days=i)).strftime('%Y-%m-%d')
+                    })
+            daily_activities.append(day_activities)
+        
+        itinerary['activities'] = daily_activities
+        itinerary['total_activity_cost'] = activity_cost
+        itinerary['total_flight_cost'] = flight_cost
+        
+        return itinerary
+
+    def _generate_mock_flights(self, destination, start_date, end_date, budget):
+        """
+        Generate mock flights for the itinerary
+        """
+        # Calculate flight budget (around 30-40% of total budget)
+        flight_budget = budget * random.uniform(0.3, 0.4)
+        
+        # Generate random departure airport
+        departure_airport = random.choice(self.DEPARTURE_AIRPORTS)
+        
+        # Find destination airport based on destination city
+        # Default to LHR if we don't have a match
+        arrival_airport_code = "LHR"
+        for dest in self.destinations:
+            if dest["name"].lower() in destination.lower() or destination.lower() in dest["name"].lower():
+                arrival_airport_code = dest.get("airport_code", "LHR")
+                break
+                
+        # List of airlines
+        airlines = [
+            "British Airways", "Air France", "Lufthansa", "KLM", 
+            "Emirates", "American Airlines", "Delta", "United", 
+            "Ryanair", "easyJet", "Virgin Atlantic", "Qatar Airways"
+        ]
+        
+        # Generate flight numbers (2 letters followed by 3-4 digits)
+        def generate_flight_number(airline):
+            airline_code = ''.join(word[0] for word in airline.split()[:2]).upper()
+            if len(airline_code) < 2:
+                airline_code = (airline_code + 'X')[:2]  # Ensure we have 2 letters
+            return f"{airline_code}{random.randint(1000, 9999)}"
+            
+        # Calculate flight times that align with itinerary dates
+        # Outbound flight: 1 day before start_date
+        outbound_departure_date = start_date - timedelta(days=1)
+        outbound_departure_hour = random.randint(6, 18)  # Between 6 AM and 6 PM
+        outbound_departure_time = datetime(
+            outbound_departure_date.year, 
+            outbound_departure_date.month, 
+            outbound_departure_date.day,
+            outbound_departure_hour, 
+            random.choice([0, 15, 30, 45])  # Random minutes
+        )
+        
+        # Calculate flight duration based on random hours and minutes
+        flight_hours = random.randint(1, 8)  # Between 1 and 8 hours
+        flight_minutes = random.choice([0, 15, 30, 45])
+        flight_duration_outbound = f"{flight_hours}h {flight_minutes}m"
+        
+        # Calculate arrival time based on departure time and duration
+        outbound_arrival_time = outbound_departure_time + timedelta(hours=flight_hours, minutes=flight_minutes)
+        
+        # Return flight: same day as end_date
+        return_departure_date = end_date
+        return_departure_hour = random.randint(10, 20)  # Between 10 AM and 8 PM
+        return_departure_time = datetime(
+            return_departure_date.year, 
+            return_departure_date.month, 
+            return_departure_date.day,
+            return_departure_hour, 
+            random.choice([0, 15, 30, 45])  # Random minutes
+        )
+        
+        # Return flight duration (slightly different from outbound)
+        flight_hours_return = random.randint(1, 8)  # Between 1 and 8 hours
+        flight_minutes_return = random.choice([0, 15, 30, 45])
+        flight_duration_return = f"{flight_hours_return}h {flight_minutes_return}m"
+        
+        # Calculate return arrival time
+        return_arrival_time = return_departure_time + timedelta(hours=flight_hours_return, minutes=flight_minutes_return)
+        
+        # Cost calculation based on flight duration and budget
+        outbound_cost = round(flight_budget * random.uniform(0.45, 0.55), 2)  # 45-55% of flight budget
+        return_cost = round(flight_budget - outbound_cost, 2)  # Remainder of flight budget
+        
+        # Select airlines
+        outbound_airline = random.choice(airlines)
+        return_airline = random.choice(airlines)
+        
+        # Generate the outbound flight
+        outbound_flight = {
+            "departure_airport": departure_airport,
+            "arrival_airport": arrival_airport_code,
+            "departure_time": outbound_departure_time,
+            "arrival_time": outbound_arrival_time,
+            "airline": outbound_airline,
+            "flight_number": generate_flight_number(outbound_airline),
+            "cost": outbound_cost,
+            "duration": flight_duration_outbound
+        }
+        
+        # Generate the return flight
+        return_flight = {
+            "departure_airport": arrival_airport_code,
+            "arrival_airport": departure_airport,
+            "departure_time": return_departure_time,
+            "arrival_time": return_arrival_time,
+            "airline": return_airline,
+            "flight_number": generate_flight_number(return_airline),
+            "cost": return_cost,
+            "duration": flight_duration_return
+        }
+        
+        return outbound_flight, return_flight
+
+    def save_itinerary_to_db(self, user_id, ai_itinerary):
+        """
+        Save the AI-generated itinerary to the database
+        
+        Args:
+            user_id (int): The ID of the user who owns the itinerary
+            ai_itinerary (dict): The AI-generated itinerary
+            
+        Returns:
+            int: The ID of the saved itinerary
+        """
+        try:
+            # Create the Itinerary record
+            itinerary = Itinerary(
+                name=ai_itinerary['name'],
+                user_id=user_id,
+                start_date=ai_itinerary['start_date'],
+                end_date=ai_itinerary['end_date'],
+                total_budget=ai_itinerary['total_budget'],
+                is_ai_generated=True
+            )
+            db.session.add(itinerary)
+            db.session.flush()  # Get the itinerary ID
+            
+            # Add flights to the itinerary if they exist
+            if 'flights' in ai_itinerary and ai_itinerary['flights']:
+                for flight_data in ai_itinerary['flights']:
+                    if not flight_data:
+                        continue
+                        
+                    flight = Flight(
+                        itinerary_id=itinerary.id,
+                        departure_airport=flight_data['departure_airport'],
+                        arrival_airport=flight_data['arrival_airport'],
+                        departure_time=flight_data['departure_time'],
+                        arrival_time=flight_data['arrival_time'],
+                        airline=flight_data['airline'],
+                        flight_number=flight_data['flight_number'],
+                        cost=flight_data['cost'],
+                        duration=flight_data['duration']
+                    )
+                    db.session.add(flight)
+            
+            # Add accommodations to the itinerary if they exist
+            if 'accommodations' in ai_itinerary and ai_itinerary['accommodations']:
+                for accommodation_data in ai_itinerary['accommodations']:
+                    accommodation = Accommodation(
+                        itinerary_id=itinerary.id,
+                        name=accommodation_data['name'],
+                        cost_per_night=accommodation_data['cost_per_night'],
+                        check_in_date=ai_itinerary['start_date'],
+                        check_out_date=ai_itinerary['end_date'],
+                        address=accommodation_data.get('location', 'To be confirmed'),
+                        type=accommodation_data.get('type', 'hotel')
+                    )
+                    db.session.add(accommodation)
+            
+            # Add activities to the itinerary if they exist
+            if 'activities' in ai_itinerary and ai_itinerary['activities']:
+                activity_start_time = ai_itinerary['start_date'].replace(hour=9, minute=0)  # Start at 9 AM on first day
+                
+                for i, activity_data in enumerate(ai_itinerary['activities']):
+                    # Calculate activity day (distribute activities evenly across days)
+                    day_index = i // 2  # Maximum 2 activities per day
+                    
+                    # If we've filled all days, start overlapping
+                    if day_index >= ai_itinerary['duration_days']:
+                        day_index = i % ai_itinerary['duration_days']
+                    
+                    # Set activity date based on day index
+                    activity_date = ai_itinerary['start_date'] + timedelta(days=day_index)
+                    
+                    # Set activity time (morning or afternoon)
+                    is_morning = (i % 2 == 0)
+                    if is_morning:
+                        start_time = activity_date.replace(hour=9, minute=0)
+                    else:
+                        start_time = activity_date.replace(hour=14, minute=0)
+                    
+                    # Calculate end time based on duration (default to 2 hours if not specified)
+                    duration_minutes = activity_data.get('duration', 120)
+                    end_time = start_time + timedelta(minutes=duration_minutes)
+                    
+                    activity = Activity(
+                        itinerary_id=itinerary.id,
+                        name=activity_data['name'],
+                        description=activity_data.get('description', ''),
+                        location=activity_data.get('location', ''),
+                        start_time=start_time,
+                        end_time=end_time,
+                        cost=activity_data['cost'],
+                        duration=duration_minutes
+                    )
+                    db.session.add(activity)
+            
+            # Add a destination record
+            destination = Destination(
+                itinerary_id=itinerary.id,
+                name=ai_itinerary['destination'],
+                arrival_date=ai_itinerary['start_date'],
+                departure_date=ai_itinerary['end_date']
+            )
+            db.session.add(destination)
+            
+            # Commit all changes
+            db.session.commit()
+            
+            return itinerary.id
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error saving AI itinerary: {str(e)}")
+            raise 
+
+    def _select_activities(self, destination, start_date, end_date, interests, budget, duration_days):
+        """
+        Select activities based on interests and budget
+        
+        Args:
+            destination (str): The destination name
+            start_date (datetime): The start date of the trip
+            end_date (datetime): The end date of the trip
+            interests (list): The user's interests
+            budget (float): The remaining budget for activities
+            duration_days (int): The duration of the trip in days
+            
+        Returns:
+            list: A list of selected activities
+        """
+        # Default activities if we can't find a match for the destination
+        default_activities = [
+            {
+                "name": "City Walking Tour",
+                "description": "Explore the city center with a knowledgeable guide",
+                "cost": 15.0,
+                "duration": 120,
+                "interests": ["culture", "history", "sightseeing"]
+            },
+            {
+                "name": "Museum Visit",
+                "description": "Visit the main museum in the city",
+                "cost": 10.0,
+                "duration": 180,
+                "interests": ["culture", "history", "art"]
+            },
+            {
+                "name": "Local Food Tour",
+                "description": "Sample the local cuisine at various restaurants",
+                "cost": 45.0,
+                "duration": 180,
+                "interests": ["food", "culture"]
+            },
+            {
+                "name": "Historical Site Visit",
+                "description": "Explore a major historical attraction",
+                "cost": 20.0,
+                "duration": 120,
+                "interests": ["history", "sightseeing"]
+            },
+            {
+                "name": "Shopping Trip",
+                "description": "Visit the main shopping area",
+                "cost": 0.0,
+                "duration": 180,
+                "interests": ["shopping"]
+            }
+        ]
+        
+        # Find activities for the destination
+        activities = []
+        
+        # First try to match by exact name
+        destination_key = None
+        for loc_name in ACTIVITIES:
+            if loc_name.lower() == destination.lower():
+                destination_key = loc_name
+                break
+        
+        # If not found, try partial matching
+        if not destination_key:
+            for loc_name in ACTIVITIES:
+                if loc_name.lower() in destination.lower() or destination.lower() in loc_name.lower():
+                    destination_key = loc_name
+                    break
+        
+        # If we have activities for this destination, use them
+        if destination_key and destination_key in ACTIVITIES:
+            activities = ACTIVITIES[destination_key].copy()
+        else:
+            # Use default activities with a slight variation
+            activities = default_activities.copy()
+            
+            # Add a custom activity based on the destination name
+            activities.append({
+                "name": f"Explore {destination}",
+                "description": f"Explore the highlights of {destination}",
+                "cost": 0.0,
+                "duration": 180,
+                "interests": ["sightseeing", "culture"]
+            })
+        
+        # Score activities based on interests
+        scored_activities = []
+        for activity in activities:
+            # Get common interests
+            activity_interests = activity.get("interests", [])
+            if not activity_interests:
+                activity_interests = ["sightseeing"]  # Default interest
+                
+            # Calculate interest matching score
+            common_interests = set(interests) & set(activity_interests)
+            score = len(common_interests) if common_interests else 0.1  # Give a small score even if no match
+            
+            scored_activities.append((activity, score))
+        
+        # Sort by score (descending) and then by cost (ascending)
+        scored_activities.sort(key=lambda x: (-x[1], x[0]['cost']))
+        
+        # Select activities while staying within budget
+        selected_activities = []
+        activity_cost = 0
+        
+        for activity, score in scored_activities:
+            if activity_cost + activity['cost'] <= budget:
+                selected_activities.append(activity)
+                activity_cost += activity['cost']
+                if len(selected_activities) >= duration_days * 2:  # Aim for 2 activities per day
+                    break
+        
+        return selected_activities 
+
+    def _select_accommodation(self, destination, start_date, end_date, budget):
+        """
+        Select an accommodation based on destination and budget
+        
+        Args:
+            destination (str): The destination name
+            start_date (datetime): The start date of the trip
+            end_date (datetime): The end date of the trip
+            budget (float): The remaining budget for accommodation
+            
+        Returns:
+            dict: The selected accommodation
+        """
+        # Default accommodations if we can't find a match for the destination
+        default_accommodations = [
+            {
+                "name": "City Center Hotel",
+                "description": "Comfortable hotel in the city center",
+                "cost_per_night": 120.0,
+                "type": "hotel",
+                "location": "City Center"
+            },
+            {
+                "name": "Budget Hostel",
+                "description": "Affordable accommodation for budget travelers",
+                "cost_per_night": 50.0,
+                "type": "hostel",
+                "location": "Near city center"
+            },
+            {
+                "name": "Luxury Resort",
+                "description": "High-end accommodation with premium amenities",
+                "cost_per_night": 350.0,
+                "type": "hotel",
+                "location": "Prime area"
+            },
+            {
+                "name": "Cozy Apartment",
+                "description": "A home away from home with kitchen and living space",
+                "cost_per_night": 100.0,
+                "type": "apartment",
+                "location": "Residential area"
+            }
+        ]
+        
+        # Duration of stay
+        nights = (end_date - start_date).days
+        
+        # Calculate the budget per night
+        budget_per_night = budget / nights if nights > 0 else budget
+        
+        # Find accommodations for the destination
+        accommodations = []
+        
+        # First try to match by exact name
+        destination_key = None
+        for loc_name in ACCOMMODATIONS:
+            if loc_name.lower() == destination.lower():
+                destination_key = loc_name
+                break
+        
+        # If not found, try partial matching
+        if not destination_key:
+            for loc_name in ACCOMMODATIONS:
+                if loc_name.lower() in destination.lower() or destination.lower() in loc_name.lower():
+                    destination_key = loc_name
+                    break
+        
+        # If we have accommodations for this destination, use them
+        if destination_key and destination_key in ACCOMMODATIONS:
+            accommodations = ACCOMMODATIONS[destination_key].copy()
+        else:
+            # Use default accommodations
+            accommodations = default_accommodations.copy()
+            
+            # Customize the names for the destination
+            for acc in accommodations:
+                if "City Center" in acc["name"]:
+                    acc["name"] = f"{destination} City Center Hotel"
+                    acc["location"] = f"{destination} City Center"
+                elif "Budget" in acc["name"]:
+                    acc["name"] = f"{destination} Budget Hostel"
+                    acc["location"] = f"Near {destination} center"
+                elif "Luxury" in acc["name"]:
+                    acc["name"] = f"{destination} Luxury Resort"
+                    acc["location"] = f"Prime area of {destination}"
+                elif "Cozy" in acc["name"]:
+                    acc["name"] = f"Cozy Apartment in {destination}"
+                    acc["location"] = f"{destination}, residential area"
+        
+        # Filter accommodations that fit within budget
+        affordable_accommodations = [acc for acc in accommodations if acc["cost_per_night"] <= budget_per_night]
+        
+        # If nothing is affordable, take the cheapest option
+        if not affordable_accommodations and accommodations:
+            affordable_accommodations = [min(accommodations, key=lambda x: x["cost_per_night"])]
+        
+        # Select the best accommodation (most expensive within budget)
+        if affordable_accommodations:
+            return max(affordable_accommodations, key=lambda x: x["cost_per_night"])
+        
+        # Fallback: Create a custom accommodation within budget
+        return {
+            "name": f"Budget Stay in {destination}",
+            "description": "Basic accommodation for travelers on a budget",
+            "cost_per_night": budget_per_night * 0.9,  # Use 90% of available budget per night
+            "type": "hotel",
+            "location": f"{destination} outskirts"
+        }

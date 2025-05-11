@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header">
+                    <h2 class="h4 mb-0">Add Accommodation to {{ itinerary.name }}</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        {{ form.csrf_token }}
+                        <div class="mb-3">
+                            {{ form.name.label(class="form-label") }}
+                            {{ form.name(class="form-control") }}
+                            {% if form.name.errors %}
+                                {% for error in form.name.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.address.label(class="form-label") }}
+                            {{ form.address(class="form-control") }}
+                            {% if form.address.errors %}
+                                {% for error in form.address.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                {{ form.check_in_date.label(class="form-label") }}
+                                {{ form.check_in_date(class="form-control") }}
+                                {% if form.check_in_date.errors %}
+                                    {% for error in form.check_in_date.errors %}
+                                        <div class="text-danger">{{ error }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.check_out_date.label(class="form-label") }}
+                                {{ form.check_out_date(class="form-control") }}
+                                {% if form.check_out_date.errors %}
+                                    {% for error in form.check_out_date.errors %}
+                                        <div class="text-danger">{{ error }}</div>
+                                    {% endfor %}
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.cost_per_night.label(class="form-label") }}
+                            {{ form.cost_per_night(class="form-control") }}
+                            {% if form.cost_per_night.errors %}
+                                {% for error in form.cost_per_night.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            {{ form.type.label(class="form-label") }}
+                            {{ form.type(class="form-select") }}
+                            {% if form.type.errors %}
+                                {% for error in form.type.errors %}
+                                    <div class="text-danger">{{ error }}</div>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('main.itinerary_detail', itinerary_id=itinerary.id) }}" class="btn btn-outline-secondary me-md-2">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus me-1"></i> Add Accommodation
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date for check_in_date to today
+    const today = new Date().toISOString().split('T')[0];
+    const checkInDateInput = document.getElementById('check_in_date');
+    const checkOutDateInput = document.getElementById('check_out_date');
+    
+    if (checkInDateInput && checkOutDateInput) {
+        // Update check_out_date minimum when check_in_date changes
+        checkInDateInput.addEventListener('change', function() {
+            if (this.value) {
+                checkOutDateInput.min = this.value;
+                // If check out date is before check in date, clear it
+                if (checkOutDateInput.value && checkOutDateInput.value < this.value) {
+                    checkOutDateInput.value = '';
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %} 

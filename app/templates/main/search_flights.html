@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Search Flights</h1>
+    
+    <div class="card">
+        <div class="card-body">
+            <form id="flightSearchForm" method="POST" action="{{ url_for('main.search_flights') }}">
+                {{ form.csrf_token }}
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            {{ form.origin.label(class="form-label") }}
+                            {{ form.origin(class="form-control", placeholder="e.g. LHR", maxlength="3", pattern="[A-Z]{3}") }}
+                            {% if form.origin.errors %}
+                                {% for error in form.origin.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="form-group">
+                            {{ form.destination.label(class="form-label") }}
+                            {{ form.destination(class="form-control", placeholder="e.g. JFK", maxlength="3", pattern="[A-Z]{3}") }}
+                            {% if form.destination.errors %}
+                                {% for error in form.destination.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            {{ form.departure_date.label(class="form-label") }}
+                            {{ form.departure_date(class="form-control", required=true) }}
+                            {% if form.departure_date.errors %}
+                                {% for error in form.departure_date.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            {{ form.return_date.label(class="form-label") }}
+                            {{ form.return_date(class="form-control") }}
+                            {% if form.return_date.errors %}
+                                {% for error in form.return_date.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-group">
+                            {{ form.adults.label(class="form-label") }}
+                            {{ form.adults(class="form-control", min=1, max=9, value=1) }}
+                            {% if form.adults.errors %}
+                                {% for error in form.adults.errors %}
+                                    <span class="text-danger">{{ error }}</span>
+                                {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {{ form.submit(class="btn btn-primary mt-3") }}
+            </form>
+        </div>
+    </div>
+
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-info mt-3">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if flights and flights.status == 'success' %}
+        <div id="searchResults" class="mt-4">
+            <h2>Available Flights</h2>
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Airline</th>
+                            <th>Flight</th>
+                            <th>Departure</th>
+                            <th>Arrival</th>
+                            <th>Duration</th>
+                            <th>Price</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for flight in flights.flights %}
+                        <tr>
+                            <td>
+                                {% if flight.segments|length == 1 %}
+                                    <span class="badge bg-success">Direct</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Connection</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ flight.segments[0].carrierCode }}</td>
+                            <td>{{ flight.segments[0].number }}</td>
+                            <td>
+                                <strong>{{ flight.segments[0].departure.iataCode }}</strong>
+                                <br>
+                                <small>{{ flight.segments[0].departure.at|replace('T', ' ')|replace('Z', '') }}</small>
+                            </td>
+                            <td>
+                                <strong>{{ flight.segments[0].arrival.iataCode }}</strong>
+                                <br>
+                                <small>{{ flight.segments[0].arrival.at|replace('T', ' ')|replace('Z', '') }}</small>
+                            </td>
+                            <td>{{ flight.segments[0].duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</td>
+                            <td>
+                                <strong class="text-success">
+                                    {{ flight.price.currency }} {{ flight.price.total }}
+                                </strong>
+                            </td>
+                            <td>
+                                <a href="{{ url_for('main.book_flight', flight_id=flight.id) }}" class="btn btn-sm btn-primary">
+                                    Save to Itinerary
+                                </a>
+                            </td>
+                        </tr>
+                        {% if flight.segments|length > 1 %}
+                            {% for segment in flight.segments[1:] %}
+                            <tr class="table-light">
+                                <td colspan="2"></td>
+                                <td>{{ segment.number }}</td>
+                                <td>
+                                    <strong>{{ segment.departure.iataCode }}</strong>
+                                    <br>
+                                    <small>{{ segment.departure.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                </td>
+                                <td>
+                                    <strong>{{ segment.arrival.iataCode }}</strong>
+                                    <br>
+                                    <small>{{ segment.arrival.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                </td>
+                                <td>{{ segment.duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                            {% endfor %}
+                        {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date to today for departure date
+    const today = new Date().toISOString().split('T')[0];
+    const departureInput = document.getElementById('departure_date');
+    const returnInput = document.getElementById('return_date');
+    
+    departureInput.min = today;
+    
+    // Update return date minimum when departure date changes
+    departureInput.addEventListener('change', function() {
+        if (this.value) {
+            returnInput.min = this.value;
+            // If return date is before departure date, clear it
+            if (returnInput.value && returnInput.value < this.value) {
+                returnInput.value = '';
+            }
+        }
+    });
+    
+    // Convert airport codes to uppercase
+    ['origin', 'destination'].forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+    });
+});
+</script>
+{% endblock %} 

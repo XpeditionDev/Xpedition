@@ -1,0 +1,371 @@
+{% extends "base.html" %}
+
+{% block title %}Flight Price Search Results{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .price-tag {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .price-diff-negative {
+            color: #28a745;
+        }
+        .price-diff-positive {
+            color: #dc3545;
+        }
+        .search-step {
+            padding: 8px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .search-step.found {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .search-step.not-found {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .visualization-container {
+            margin-top: 30px;
+            margin-bottom: 30px;
+        }
+        .card-header {
+            font-weight: bold;
+        }
+        .badge {
+            font-size: 0.9em;
+        }
+        .iteration-badge {
+            background-color: #17a2b8;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        .price-display {
+            font-size: 1.4em;
+            font-weight: bold;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="mb-4">Flight Price Search Results</h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h5 mb-0">Search Parameters</h2>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>From:</strong> {{ search_params.from }}</p>
+                            <p><strong>To:</strong> {% if search_params.to %}{{ search_params.to }}{% else %}Any destination{% endif %}</p>
+                            <p><strong>Departure Date:</strong> {{ search_params.departure_date }}</p>
+                            {% if search_params.return_date %}
+                                <p><strong>Return Date:</strong> {{ search_params.return_date }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>Target Price:</strong> £{{ "%.2f"|format(search_params.price) }}</p>
+                            <p><strong>Initial Tolerance:</strong> £{{ "%.2f"|format(search_params.tolerance) }}</p>
+                            {% if results.final_tolerance != search_params.tolerance %}
+                                <p><strong>Final Tolerance:</strong> £{{ "%.2f"|format(results.final_tolerance) }}</p>
+                            {% endif %}
+                            <p><strong>Adaptive Tolerance:</strong> {{ "Enabled" if search_params.adaptive_tolerance else "Disabled" }}</p>
+                        </div>
+                    </div>
+                    <div class="text-end mt-3">
+                        <a href="{{ url_for('search.flight_price_search') }}" class="btn btn-outline-primary">New Search</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h5 mb-0">Results</h2>
+                </div>
+                <div class="card-body">
+                    {% if results.flights|length > 0 %}
+                        <p>Found {{ results.flights|length }} flights matching your price criteria:</p>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Airline</th>
+                                        <th>Departure</th>
+                                        <th>Arrival</th>
+                                        <th>Duration</th>
+                                        <th>Stops</th>
+                                        <th>Price</th>
+                                        <th>Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for flight in results.flights %}
+                                    <tr>
+                                        <td>
+                                            {{ flight.airline }}<br>
+                                            <small class="text-muted">{{ flight.flight_number }}</small>
+                                        </td>
+                                        <td>
+                                            {{ flight.departure_airport }}<br>
+                                            <small class="text-muted">{{ flight.departure_time|replace('T', ' ')|replace('Z', '')|truncate(16, True, '') }}</small>
+                                        </td>
+                                        <td>
+                                            {{ flight.arrival_airport }}<br>
+                                            <small class="text-muted">{{ flight.arrival_time|replace('T', ' ')|replace('Z', '')|truncate(16, True, '') }}</small>
+                                        </td>
+                                        <td>{{ flight.duration }}</td>
+                                        <td>
+                                            {% if flight.stops == 0 %}
+                                                <span class="badge bg-success">Direct</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">{{ flight.stops }} stop{% if flight.stops > 1 %}s{% endif %}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="price-display">£{{ "%.2f"|format(flight.price) }}</td>
+                                        <td>
+                                            {% if flight.price_difference > 0 %}
+                                                <span class="badge {% if flight.price > search_params.price %}bg-danger{% else %}bg-success{% endif %}">
+                                                    {{ "±£%.2f"|format(flight.price_difference) }}
+                                                    <small>({{ '%+.1f%%'|format(flight.price_percentage) }})</small>
+                                                </span>
+                                            {% else %}
+                                                <span class="badge bg-primary">Exact match!</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning">
+                            <p>No flights found matching your price criteria.</p>
+                            <p>Try adjusting your target price or increasing the tolerance.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Performance Metrics -->
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h3 class="h5 mb-0">Binary Search Performance</h3>
+                </div>
+                <div class="card-body">
+                    <p><strong>Execution Time:</strong> {{ "%.2f"|format(results.performance.execution_time_ms) }} ms</p>
+                    <p><strong>Iterations:</strong> {{ results.performance.iterations }}</p>
+                    <p><strong>Price Range in Database:</strong> 
+                        {% if results.performance.min_price is not none and results.performance.max_price is not none %}
+                            £{{ "%.2f"|format(results.performance.min_price) }} to £{{ "%.2f"|format(results.performance.max_price) }}
+                        {% else %}
+                            No price range available
+                        {% endif %}
+                    </p>
+                    {% if results.found_exact_match %}
+                        <div class="alert alert-success">
+                            <i class="fas fa-check-circle"></i> Found exact match within tolerance!
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Showing best available matches.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Visualization Data -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="h5 mb-0">Search Visualization</h3>
+                </div>
+                <div class="card-body">
+                    <canvas id="searchStepsChart" width="400" height="200"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    {% if results.visualization and results.visualization.search_steps %}
+    <!-- Search Steps Timeline -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-secondary text-white">
+                    <h3 class="h5 mb-0">Binary Search Steps</h3>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        {% for step in results.visualization.search_steps %}
+                            <div class="search-step {% if step.matches_found > 0 %}found{% else %}not-found{% endif %}">
+                                <span class="iteration-badge">Iteration {{ step.iteration }}</span>
+                                <p><strong>Searching around price:</strong> 
+                                    {% if step.mid_price is not none %}
+                                        £{{ "%.2f"|format(step.mid_price) }}
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                </p>
+                                <p><strong>Range:</strong> 
+                                    {% if step.lower_bound is not none and step.upper_bound is not none %}
+                                        £{{ "%.2f"|format(step.lower_bound) }} to £{{ "%.2f"|format(step.upper_bound) }}
+                                    {% else %}
+                                        Not available
+                                    {% endif %}
+                                </p>
+                                <p><strong>Flights found:</strong> {{ step.matches_found }}</p>
+                                {% if step.closest_price is not none %}
+                                    <p><strong>Closest price:</strong> £{{ "%.2f"|format(step.closest_price) }}</p>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    {% if results.visualization and results.visualization.histogram_data %}
+    <!-- Price Histogram -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header bg-info text-white">
+                    <h3 class="h5 mb-0">Price Distribution</h3>
+                </div>
+                <div class="card-body">
+                    <div class="visualization-container">
+                        <canvas id="priceHistogram" width="800" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Setup search steps chart
+    {% if results.visualization and results.visualization.search_steps %}
+    const searchStepsCanvas = document.getElementById('searchStepsChart');
+    const searchStepsChart = new Chart(searchStepsCanvas, {
+        type: 'line',
+        data: {
+            labels: [{% for step in results.visualization.search_steps %}'{{ step.iteration }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+            datasets: [
+                {
+                    label: 'Search Price',
+                    data: [{% for step in results.visualization.search_steps %}{{ step.mid_price if step.mid_price is not none else 'null' }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    borderWidth: 2,
+                    fill: false
+                },
+                {
+                    label: 'Target Price',
+                    data: [{% for step in results.visualization.search_steps %}{{ search_params.price if search_params.price is not none else 'null' }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    fill: false
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Price (£)'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Iteration'
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+    
+    // Setup price histogram
+    {% if results.visualization and results.visualization.histogram_data %}
+    const histogramCanvas = document.getElementById('priceHistogram');
+    const histogramChart = new Chart(histogramCanvas, {
+        type: 'bar',
+        data: {
+            labels: [
+                {% for i in range(results.visualization.histogram_data.bin_edges|length - 1) %}
+                '£{{ "%.0f"|format(results.visualization.histogram_data.bin_edges[i]) if results.visualization.histogram_data.bin_edges[i] is not none else 0 }} - £{{ "%.0f"|format(results.visualization.histogram_data.bin_edges[i+1]) if results.visualization.histogram_data.bin_edges[i+1] is not none else 0 }}'{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            ],
+            datasets: [{
+                label: 'Number of Flights',
+                data: {{ results.visualization.histogram_data.counts }},
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Price Range (£)'
+                    }
+                }
+            },
+            plugins: {
+                annotation: {
+                    annotations: {
+                        line1: {
+                            type: 'line',
+                            xMin: {{ search_params.price if search_params.price is not none else 0 }},
+                            xMax: {{ search_params.price if search_params.price is not none else 0 }},
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderWidth: 2,
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+</script>
+{% endblock %} 

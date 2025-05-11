@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Search Activities{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Search Activities</h1>
+    
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('search.activity_search') }}">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="location" class="form-label">Location</label>
+                            <input type="text" class="form-control" id="location" name="location" 
+                                   required placeholder="Enter a location">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="activity_date" class="form-label">Activity Date</label>
+                            <input type="date" class="form-control" id="activity_date" name="activity_date">
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="activity_type" class="form-label">Activity Type</label>
+                            <select class="form-control" id="activity_type" name="activity_type">
+                                <option value="">All Types</option>
+                                <option value="outdoor">Outdoor</option>
+                                <option value="cultural">Cultural</option>
+                                <option value="food">Food</option>
+                                <option value="adventure">Adventure</option>
+                                <option value="entertainment">Entertainment</option>
+                                <option value="sports">Sports</option>
+                                <option value="relaxation">Relaxation</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="participants" class="form-label">Number of Participants</label>
+                            <input type="number" class="form-control" id="participants" name="participants" 
+                                   min="1" value="1">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary">Search Activities</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="activity-results" class="mt-4">
+        <!-- Activity results will be populated here -->
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('activity-search-form');
+    const resultsDiv = document.getElementById('activity-results');
+
+    form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const formData = {
+            location: document.getElementById('location').value,
+            activity_date: document.getElementById('activity_date').value,
+            activity_type: document.getElementById('activity_type').value,
+            participants: document.getElementById('participants').value
+        };
+
+        try {
+            const response = await fetch('{{ url_for("search.activity_search") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(formData)
+            });
+
+            const data = await response.json();
+            
+            // Display activities
+            resultsDiv.innerHTML = `
+                <h2>Available Activities</h2>
+                <div class="row">
+                    ${data.map(activity => `
+                        <div class="col-md-4 mb-4">
+                            <div class="card">
+                                <div class="card-body">
+                                    <h5 class="card-title">${activity.name}</h5>
+                                    <p class="card-text">${activity.description}</p>
+                                    <p class="card-text">
+                                        <small class="text-muted">
+                                            <i class="fas fa-map-marker-alt"></i> ${activity.location}<br>
+                                            <i class="fas fa-tag"></i> ${activity.price}<br>
+                                            <i class="fas fa-users"></i> Up to ${activity.max_participants} participants
+                                        </small>
+                                    </p>
+                                    <a href="#" class="btn btn-primary">Book Now</a>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error:', error);
+            resultsDiv.innerHTML = '<div class="alert alert-danger">Error fetching activities</div>';
+        }
+    });
+});
+</script>
+{% endblock %}

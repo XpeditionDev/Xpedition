@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}Save Activity to Itinerary{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Save Activity to Itinerary</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <p><strong>Activity Details:</strong></p>
+                        <p><strong>{{ activity.name }}</strong></p>
+                        <p>{{ activity.description }}</p>
+                        <p>Location: {{ activity.location }}</p>
+                        <p>Duration: {{ activity.duration }} minutes</p>
+                        <p>Price: {{ activity.price.currency }} {{ activity.price.amount }}</p>
+                    </div>
+                    
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="mb-3">
+                            <label for="activity_date" class="form-label">Activity Date</label>
+                            <input type="date" class="form-control" id="activity_date" name="activity_date" 
+                                value="{{ activity_date }}" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="activity_time" class="form-label">Activity Time</label>
+                            <input type="time" class="form-control" id="activity_time" name="activity_time" 
+                                value="10:00" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="itinerary_id" class="form-label">Select an Itinerary</label>
+                            <select class="form-control" id="itinerary_id" name="itinerary_id" required>
+                                <option value="" disabled selected>Choose an itinerary...</option>
+                                {% for itinerary in itineraries %}
+                                <option value="{{ itinerary.id }}">{{ itinerary.name }} ({{ itinerary.start_date.strftime('%Y-%m-%d') }} to {{ itinerary.end_date.strftime('%Y-%m-%d') }})</option>
+                                {% endfor %}
+                                <option value="new">+ Create new itinerary</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="new_itinerary_div" style="display: none;">
+                            <label for="new_itinerary_name" class="form-label">New Itinerary Name</label>
+                            <input type="text" class="form-control" id="new_itinerary_name" name="new_itinerary_name" placeholder="Enter a name for your new itinerary">
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success">Save to Itinerary</button>
+                            <a href="{{ url_for('main.activity_search') }}" class="btn btn-outline-secondary">Back to Activity Search</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const itinerarySelect = document.getElementById('itinerary_id');
+        const newItineraryDiv = document.getElementById('new_itinerary_div');
+        
+        itinerarySelect.addEventListener('change', function() {
+            if (this.value === 'new') {
+                newItineraryDiv.style.display = 'block';
+                document.getElementById('new_itinerary_name').required = true;
+            } else {
+                newItineraryDiv.style.display = 'none';
+                document.getElementById('new_itinerary_name').required = false;
+            }
+        });
+    });
+</script>
+{% endblock %}
+{% endblock %} 

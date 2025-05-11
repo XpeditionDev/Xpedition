@@ -1,0 +1,417 @@
+{% extends 'base.html' %}
+
+{% block styles %}
+{{ super() }}
+<style>
+    .search-form {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .algorithm-comparison {
+        margin-top: 30px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .comparison-header {
+        background-color: #f0f0f0;
+        padding: 15px;
+        border-radius: 8px 8px 0 0;
+    }
+    
+    .algorithm-section {
+        border: 1px solid #ddd;
+        margin-bottom: 20px;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .algorithm-header {
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .binary-search {
+        border-color: #28a745;
+    }
+    
+    .binary-search .algorithm-header {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    
+    .linear-search {
+        border-color: #007bff;
+    }
+    
+    .linear-search .algorithm-header {
+        background-color: #cce5ff;
+        color: #004085;
+    }
+    
+    .performance-metrics {
+        background-color: #f8f9fa;
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        border-radius: 4px;
+    }
+    
+    .metric {
+        display: inline-block;
+        margin-right: 20px;
+        font-weight: bold;
+    }
+    
+    .metric-value {
+        font-weight: normal;
+    }
+    
+    .results-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .results-table th, .results-table td {
+        padding: 10px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .results-table th {
+        background-color: #f2f2f2;
+    }
+    
+    .results-table tr:hover {
+        background-color: #f5f5f5;
+    }
+    
+    .price-match {
+        font-weight: bold;
+        color: #28a745;
+    }
+    
+    .visualization {
+        height: 50px;
+        margin: 10px 0;
+        position: relative;
+        background-color: #f2f2f2;
+        border-radius: 4px;
+    }
+    
+    .search-point {
+        position: absolute;
+        width: 2px;
+        height: 100%;
+        background-color: #dc3545;
+    }
+    
+    .target-point {
+        position: absolute;
+        width: 2px;
+        height: 100%;
+        background-color: #28a745;
+    }
+    
+    .algorithm-info {
+        margin: 20px 0;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #6c757d;
+    }
+    
+    .binary-info {
+        border-left-color: #28a745;
+    }
+    
+    .linear-info {
+        border-left-color: #007bff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="my-4">{{ title }}</h1>
+    
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3>Advanced Flight Price Search</h3>
+                    <p class="text-muted mb-0">Using binary search to find flights within a specific price range</p>
+                </div>
+                <div class="card-body">
+                    <div class="algorithm-info binary-info">
+                        <h4>Binary Search Implementation</h4>
+                        <p>This feature demonstrates the use of binary search algorithm to efficiently find flights at or near your target price in the database.</p>
+                        <p>Binary search has a time complexity of O(log n), making it significantly faster than linear search (O(n)) as the dataset grows.</p>
+                    </div>
+                    
+                    <form method="POST" class="search-form">
+                        {{ form.hidden_tag() if form }}
+                        <div class="form-group">
+                            <label for="target_price"><strong>Target Price (£):</strong></label>
+                            <input type="number" class="form-control" id="target_price" name="target_price" 
+                                   placeholder="Enter your target price" min="1" step="0.01" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="price_tolerance"><strong>Price Tolerance (£):</strong></label>
+                            <input type="number" class="form-control" id="price_tolerance" name="price_tolerance" 
+                                   value="50" min="1" step="0.01">
+                            <small class="form-text text-muted">How close to the target price (±)</small>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group col-md-6">
+                                <label for="origin"><strong>Origin Airport (Optional):</strong></label>
+                                <input type="text" class="form-control" id="origin" name="origin" 
+                                       placeholder="e.g. LHR" maxlength="3">
+                                <small class="form-text text-muted">3-letter IATA code</small>
+                            </div>
+                            <div class="form-group col-md-6">
+                                <label for="destination"><strong>Destination Airport (Optional):</strong></label>
+                                <input type="text" class="form-control" id="destination" name="destination" 
+                                       placeholder="e.g. JFK" maxlength="3">
+                                <small class="form-text text-muted">3-letter IATA code</small>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block">Search Flights</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+    {% endif %}
+    
+    {% if comparison_results %}
+    <div class="algorithm-comparison">
+        <div class="comparison-header">
+            <h3>Algorithm Comparison Results</h3>
+            <p>Target Price: <strong>£{{ comparison_results.target_price|round(2) }}</strong> 
+               with tolerance of <strong>±£{{ comparison_results.tolerance|round(2) }}</strong></p>
+            
+            {% if comparison_results.filters.origin or comparison_results.filters.destination %}
+            <p>
+                Filters: 
+                {% if comparison_results.filters.origin %}
+                <span class="badge badge-secondary">Origin: {{ comparison_results.filters.origin }}</span>
+                {% endif %}
+                {% if comparison_results.filters.destination %}
+                <span class="badge badge-secondary">Destination: {{ comparison_results.filters.destination }}</span>
+                {% endif %}
+            </p>
+            {% endif %}
+        </div>
+        
+        <div class="row mt-4">
+            <!-- Binary Search Results -->
+            <div class="col-md-6">
+                <div class="algorithm-section binary-search">
+                    <div class="algorithm-header">
+                        <h4>Binary Search</h4>
+                        <p>Efficiency: O(log n)</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="performance-metrics">
+                            <div class="metric">
+                                Execution Time: <span class="metric-value">{{ (comparison_results.binary_search.performance.execution_time * 1000)|round(2) }} ms</span>
+                            </div>
+                            <div class="metric">
+                                Iterations: <span class="metric-value">{{ comparison_results.binary_search.performance.iterations }}</span>
+                            </div>
+                            <div class="metric">
+                                DB Queries: <span class="metric-value">{{ comparison_results.binary_search.performance.comparisons }}</span>
+                            </div>
+                        </div>
+                        
+                        <h5>Results ({{ comparison_results.binary_search.results_count }} flights found)</h5>
+                        
+                        {% if comparison_results.binary_search.formatted_results %}
+                        <div class="table-responsive">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>From</th>
+                                        <th>To</th>
+                                        <th>Airline</th>
+                                        <th>Price</th>
+                                        <th>Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for flight in comparison_results.binary_search.formatted_results %}
+                                    <tr>
+                                        <td>{{ flight.departure_airport }}</td>
+                                        <td>{{ flight.arrival_airport }}</td>
+                                        <td>{{ flight.airline }}</td>
+                                        <td class="{% if flight.price_difference <= 5 %}price-match{% endif %}">
+                                            £{{ flight.cost|round(2) }}
+                                        </td>
+                                        <td>£{{ flight.price_difference|round(2) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p>No results found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Linear Search Results -->
+            <div class="col-md-6">
+                <div class="algorithm-section linear-search">
+                    <div class="algorithm-header">
+                        <h4>Linear Search</h4>
+                        <p>Efficiency: O(n)</p>
+                    </div>
+                    <div class="card-body">
+                        <div class="performance-metrics">
+                            <div class="metric">
+                                Execution Time: <span class="metric-value">{{ (comparison_results.linear_search.performance.execution_time * 1000)|round(2) }} ms</span>
+                            </div>
+                            <div class="metric">
+                                DB Queries: <span class="metric-value">{{ comparison_results.linear_search.performance.comparisons }}</span>
+                            </div>
+                        </div>
+                        
+                        <h5>Results ({{ comparison_results.linear_search.results_count }} flights found)</h5>
+                        
+                        {% if comparison_results.linear_search.formatted_results %}
+                        <div class="table-responsive">
+                            <table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>From</th>
+                                        <th>To</th>
+                                        <th>Airline</th>
+                                        <th>Price</th>
+                                        <th>Difference</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for flight in comparison_results.linear_search.formatted_results %}
+                                    <tr>
+                                        <td>{{ flight.departure_airport }}</td>
+                                        <td>{{ flight.arrival_airport }}</td>
+                                        <td>{{ flight.airline }}</td>
+                                        <td class="{% if flight.price_difference <= 5 %}price-match{% endif %}">
+                                            £{{ flight.cost|round(2) }}
+                                        </td>
+                                        <td>£{{ flight.price_difference|round(2) }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <p>No results found.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h4>Algorithm Comparison</h4>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="algorithm-info binary-info">
+                            <h5>Binary Search</h5>
+                            <p>Binary search divides the search space in half with each iteration, making it more efficient for large datasets.</p>
+                            <p>It finds the median price point in the database and narrows down the search based on whether the target price is higher or lower.</p>
+                            <p><strong>Time Complexity:</strong> O(log n)</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="algorithm-info linear-info">
+                            <h5>Linear Search</h5>
+                            <p>Linear search scans the entire dataset in one go, which is simple but less efficient for large datasets.</p>
+                            <p>It directly queries for all flights within the price tolerance range in a single database operation.</p>
+                            <p><strong>Time Complexity:</strong> O(n)</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="performance-comparison mt-4">
+                    <h5>Performance Metrics</h5>
+                    <p>
+                        <strong>Time Difference:</strong> 
+                        {% set time_diff = (comparison_results.binary_search.performance.execution_time - comparison_results.linear_search.performance.execution_time) * 1000 %}
+                        {% if time_diff > 0 %}
+                            Linear search was faster by {{ time_diff|abs|round(2) }} ms
+                        {% elif time_diff < 0 %}
+                            Binary search was faster by {{ time_diff|abs|round(2) }} ms
+                        {% else %}
+                            Both algorithms took the same time
+                        {% endif %}
+                    </p>
+                    <p>
+                        <strong>Database Query Difference:</strong>
+                        Binary search used {{ comparison_results.binary_search.performance.comparisons }} queries vs 
+                        linear search's {{ comparison_results.linear_search.performance.comparisons }} query
+                    </p>
+                    <p class="text-muted">
+                        <small>Note: For small datasets, linear search may be faster due to lower overhead. 
+                        Binary search becomes more efficient as data volume increases.</small>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+    // Convert IATA codes to uppercase as user types
+    document.addEventListener('DOMContentLoaded', function() {
+        const originInput = document.getElementById('origin');
+        const destinationInput = document.getElementById('destination');
+        
+        if (originInput) {
+            originInput.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+        
+        if (destinationInput) {
+            destinationInput.addEventListener('input', function() {
+                this.value = this.value.toUpperCase();
+            });
+        }
+        
+        // Add a nice animation for showing the results
+        const comparisonResults = document.querySelector('.algorithm-comparison');
+        if (comparisonResults) {
+            comparisonResults.style.opacity = '0';
+            comparisonResults.style.transition = 'opacity 0.5s ease-in';
+            
+            setTimeout(function() {
+                comparisonResults.style.opacity = '1';
+            }, 100);
+        }
+    });
+</script>
+{% endblock %} 

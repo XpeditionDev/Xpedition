@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Search Flights by Price{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-12 text-center mb-4">
+            <h1>Search Flights by Price</h1>
+            <p class="text-muted">Find flights using our advanced binary search algorithm</p>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    <div class="row">
+        <div class="col-md-6 mx-auto">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Price-based Flight Search</h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('search.flight_price_search') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="from">Origin Airport (IATA code):</label>
+                                    <input type="text" id="from" name="from" maxlength="3" 
+                                           class="form-control" placeholder="e.g. LHR" required>
+                                    <small class="form-text text-muted">Enter the 3-letter airport code</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="to">Destination Airport (IATA code):</label>
+                                    <input type="text" id="to" name="to" maxlength="3" 
+                                           class="form-control" placeholder="e.g. JFK">
+                                    <small class="form-text text-muted">Enter the 3-letter airport code (optional)</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="departure_date">Departure Date:</label>
+                                    <input type="date" id="departure_date" name="departure_date" 
+                                           class="form-control" value="{{ today_date }}">
+                                    <small class="form-text text-muted">Optional: Filter by departure date</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="return_date">Return Date:</label>
+                                    <input type="date" id="return_date" name="return_date" 
+                                           class="form-control">
+                                    <small class="form-text text-muted">Optional: For round trips</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="price">Target Price (£):</label>
+                                    <input type="number" id="price" name="price" min="50" max="10000" step="0.01"
+                                           class="form-control" value="500" required>
+                                    <small class="form-text text-muted">Enter your budget</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-group mb-3">
+                                    <label for="tolerance">Price Tolerance (£):</label>
+                                    <input type="number" id="tolerance" name="tolerance" min="10" max="1000" step="0.01"
+                                           class="form-control" value="100" required>
+                                    <small class="form-text text-muted">How much above or below your target price is acceptable?</small>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="adaptive_tolerance" name="adaptive_tolerance">
+                            <label class="form-check-label" for="adaptive_tolerance">
+                                Use adaptive tolerance
+                            </label>
+                            <small class="form-text text-muted d-block">
+                                Automatically adjust price tolerance if no flights are found in the initial range
+                            </small>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-block w-100">
+                            <i class="fas fa-search"></i> Search Flights
+                        </button>
+                    </form>
+                </div>
+                <div class="card-footer">
+                    <small class="text-muted">Our binary search algorithm efficiently finds flights within your price range</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h4 class="mb-0">About Binary Search</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <h5>How It Works</h5>
+                            <p>Binary search is an efficient algorithm for finding a target value within a sorted array. The algorithm:</p>
+                            <ul>
+                                <li>Compares the target value to the middle element of the array</li>
+                                <li>If they match, returns the middle position</li>
+                                <li>If the target is less than the middle element, continues search in the left half</li>
+                                <li>If the target is greater, continues search in the right half</li>
+                            </ul>
+                            <p>This makes it much faster than a linear search (checking each element in order) for large datasets.</p>
+                        </div>
+                        <div class="col-md-4">
+                            <h5>Adaptive Tolerance</h5>
+                            <p>When enabled, if no flights are found in your initial price range, the system will gradually widen the search until flights are found.</p>
+                            <p>This ensures you'll always get results, even if they're outside your initial budget.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Set default date to today if not already set
+        const departureDate = document.getElementById('departure_date');
+        if (!departureDate.value) {
+            const today = new Date();
+            const dateString = today.toISOString().split('T')[0];
+            departureDate.value = dateString;
+        }
+        
+        // Validate return date is after departure date
+        const returnDate = document.getElementById('return_date');
+        departureDate.addEventListener('change', function() {
+            if (returnDate.value && returnDate.value < departureDate.value) {
+                returnDate.value = departureDate.value;
+            }
+            returnDate.min = departureDate.value;
+        });
+        
+        // Set min return date when page loads
+        if (departureDate.value) {
+            returnDate.min = departureDate.value;
+        }
+        
+        // Form validation
+        const form = document.querySelector('form');
+        form.addEventListener('submit', function(event) {
+            const from = document.getElementById('from').value.trim().toUpperCase();
+            const to = document.getElementById('to').value.trim().toUpperCase();
+            
+            if (from.length !== 3) {
+                alert('Origin airport code must be exactly 3 letters');
+                event.preventDefault();
+                return;
+            }
+            
+            if (to.length > 0 && to.length !== 3) {
+                alert('Destination airport code must be exactly 3 letters');
+                event.preventDefault();
+                return;
+            }
+            
+            if (to.length > 0 && from === to) {
+                alert('Origin and destination cannot be the same');
+                event.preventDefault();
+                return;
+            }
+        });
+    });
+</script>
+{% endblock %} 

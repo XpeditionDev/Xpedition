@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}Search Flights{% endblock %}
+
+{% block head %}
+    {{ super() }}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        /* Header styles */
+        .header-container {
+            background-color: #2b9e5a;
+            color: white;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            margin-bottom: 0;
+            border-radius: 4px 4px 0 0;
+        }
+        .header-container h2 {
+            margin: 0;
+            font-size: 24px;
+        }
+        .header-container i {
+            margin-right: 10px;
+            font-size: 20px;
+        }
+        
+        /* Table styles */
+        .flight-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid #dee2e6;
+            margin-bottom: 30px;
+        }
+        .flight-table th {
+            background-color: #f8f9fa;
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: bold;
+            border-bottom: 2px solid #dee2e6;
+        }
+        .flight-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: middle;
+        }
+        
+        /* Badge styles */
+        .connection-badge {
+            background-color: #ffc107;
+            color: #000;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .return-flight {
+            background-color: #17a2b8;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+        
+        /* Button styles */
+        .save-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        .save-btn:hover {
+            background-color: #0069d9;
+        }
+        
+        /* Price display */
+        .price-column {
+            font-weight: bold;
+            color: #28a745;
+            font-size: 1.1em;
+        }
+        
+        /* Search form and filters */
+        .search-container {
+            display: flex;
+            margin-top: 20px;
+        }
+        .filters {
+            flex: 0 0 25%;
+            padding-right: 20px;
+        }
+        .results-container {
+            flex: 1;
+        }
+        
+        /* Hide footer */
+        footer {
+            display: none !important;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div class="container">
+        <div class="row mb-4">
+            <div class="col-12">
+                <h1 class="text-center">Flight Search</h1>
+                
+                <!-- Search Form -->
+                <div class="card">
+                    <div class="card-body">
+                        <form method="POST" action="{{ url_for('search.flight_search') }}" class="row g-3">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            
+                            <div class="col-md-3">
+                                <label for="from" class="form-label">From (IATA code)</label>
+                                <input type="text" class="form-control" id="from" name="from" 
+                                       value="{{ search_params.from if search_params else '' }}" 
+                                       placeholder="e.g. LHR" required maxlength="3">
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <label for="to" class="form-label">To (IATA code)</label>
+                                <input type="text" class="form-control" id="to" name="to" 
+                                       value="{{ search_params.to if search_params else '' }}" 
+                                       placeholder="e.g. JFK" required maxlength="3">
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label for="departure_date" class="form-label">Departure Date</label>
+                                <input type="date" class="form-control" id="departure_date" name="departure_date" 
+                                       value="{{ search_params.departure_date if search_params else '' }}" required>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <label for="return_date" class="form-label">Return Date (optional)</label>
+                                <input type="date" class="form-control" id="return_date" name="return_date" 
+                                       value="{{ search_params.return_date if search_params else '' }}">
+                            </div>
+                            
+                            <div class="col-md-1">
+                                <label for="passengers" class="form-label">Passengers</label>
+                                <input type="number" class="form-control" id="passengers" name="passengers" 
+                                       value="{{ search_params.passengers if search_params else 1 }}" min="1" max="9">
+                            </div>
+                            
+                            <div class="col-md-1 d-flex align-items-end">
+                                <button type="submit" class="btn btn-primary w-100">Search</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        {% if formatted_flights %}
+        <div class="row">
+            <div class="col-12">
+                <!-- Flight Results -->
+                <div class="header-container">
+                    <h2><i class="fas fa-plane"></i> Available Flights</h2>
+                </div>
+                <div class="table-responsive">
+                    <table class="flight-table">
+                        <thead>
+                            <tr>
+                                <th>Type</th>
+                                <th>Airline</th>
+                                <th>Flight</th>
+                                <th>Departure</th>
+                                <th>Arrival</th>
+                                <th>Duration</th>
+                                <th>Price</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for flight in formatted_flights %}
+                                <!-- Outbound Flight -->
+                                <tr>
+                                    <td>
+                                        <span class="connection-badge">Connection</span>
+                                    </td>
+                                    <td>{{ flight.airline }}</td>
+                                    <td>
+                                        {% if flight.flight_number %}
+                                            {{ flight.flight_number }}
+                                        {% else %}
+                                            {{ 8800 + loop.index }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ flight.departure.airport }}<br>
+                                        {{ flight.departure.time|datetime }}
+                                    </td>
+                                    <td>
+                                        {{ flight.arrival.airport }}<br>
+                                        {{ flight.arrival.time|datetime }}
+                                    </td>
+                                    <td>{{ flight.details.outbound.duration }}</td>
+                                    <td class="price-column">
+                                        {% if flight.price.currency == 'GBP' %}
+                                            £{{ flight.price.total | round(2) }}
+                                        {% else %}
+                                            {{ flight.price.display }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <button class="save-btn" onclick="selectFlight({{ loop.index0 }})">Save to Itinerary</button>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Return Flight if exists -->
+                                {% if flight.details.return %}
+                                <tr>
+                                    <td>
+                                        <span class="connection-badge">Connection</span>
+                                    </td>
+                                    <td>{{ flight.airline }}</td>
+                                    <td>
+                                        {% if flight.flight_number %}
+                                            {{ flight.flight_number }}
+                                        {% else %}
+                                            {{ 8800 + loop.index + 70 }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ flight.details.return.departure.airport }}<br>
+                                        {{ flight.details.return.departure.time|datetime }}
+                                    </td>
+                                    <td>
+                                        {{ flight.details.return.arrival.airport }}<br>
+                                        {{ flight.details.return.arrival.time|datetime }}
+                                    </td>
+                                    <td>{{ flight.details.return.duration }}</td>
+                                    <td class="price-column">
+                                        <span class="return-flight">Return Flight</span>
+                                    </td>
+                                    <td>
+                                        <!-- No button for return flight -->
+                                    </td>
+                                </tr>
+                                {% endif %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% else %}
+            {% if search_params %}
+            <div class="alert alert-info">
+                <p>No flights found for the specified criteria. Please try different search parameters.</p>
+            </div>
+            {% endif %}
+        {% endif %}
+    </div>
+
+    <!-- Flight Selection Modal -->
+    <div class="modal fade" id="flightModal" tabindex="-1" aria-labelledby="flightModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="flightModalLabel">Save Flight to Itinerary</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Would you like to save this flight to an existing itinerary or create a new one?</p>
+                    
+                    <form id="save_flight_form" method="POST" action="/search/flights">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <input type="hidden" id="selected_flight_data" name="flight_data" value="">
+                        
+                        <div class="mb-3">
+                            <label for="itinerary_id" class="form-label">Itinerary</label>
+                            <select class="form-select" id="itinerary_id" name="itinerary_id">
+                                <option value="new">Create New Itinerary</option>
+                                {% if user_itineraries %}
+                                    {% for itinerary in user_itineraries %}
+                                        <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3" id="new_itinerary_name_container">
+                            <label for="new_itinerary_name" class="form-label">New Itinerary Name</label>
+                            <input type="text" class="form-control" id="new_itinerary_name" name="new_itinerary_name">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="save_flight_btn">Save Flight</button>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Hide/show new itinerary name field based on selection
+        const itinerarySelect = document.getElementById('itinerary_id');
+        const newItineraryContainer = document.getElementById('new_itinerary_name_container');
+        
+        if (itinerarySelect && newItineraryContainer) {
+            itinerarySelect.addEventListener('change', function() {
+                if (this.value === 'new') {
+                    newItineraryContainer.style.display = 'block';
+                } else {
+                    newItineraryContainer.style.display = 'none';
+                }
+            });
+            
+            // Initial state
+            if (itinerarySelect.value === 'new') {
+                newItineraryContainer.style.display = 'block';
+            } else {
+                newItineraryContainer.style.display = 'none';
+            }
+        }
+        
+        // Show modal when save button is clicked
+        const saveFlightBtn = document.getElementById('save_flight_btn');
+        if (saveFlightBtn) {
+            saveFlightBtn.addEventListener('click', function() {
+                const form = document.getElementById('save_flight_form');
+                if (form) {
+                    form.submit();
+                }
+            });
+        }
+    });
+    
+    function selectFlight(flightIndex) {
+        // Show the modal
+        const modal = new bootstrap.Modal(document.getElementById('flightModal'));
+        if (modal) {
+            // Set the selected flight data
+            const selectedFlightInput = document.getElementById('selected_flight_data');
+            if (selectedFlightInput) {
+                // Get the complete flight data from the global formatted_flights array
+                const flights = {{ formatted_flights|tojson if formatted_flights is defined else '[]' }};
+                if (flights && flights[flightIndex]) {
+                    selectedFlightInput.value = JSON.stringify(flights[flightIndex]);
+                } else {
+                    selectedFlightInput.value = JSON.stringify({
+                        index: flightIndex
+                    });
+                }
+            }
+            modal.show();
+        } else {
+            // Fallback if modal can't be shown
+            alert('This feature would save the flight to your itinerary. The backend implementation is in progress.');
+        }
+    }
+</script>
+{% endblock %} 

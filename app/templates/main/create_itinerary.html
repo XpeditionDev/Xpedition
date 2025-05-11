@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">Create New Itinerary</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {{ form.name(class="form-control") }}
+                        {% for error in form.name.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.start_date.label(class="form-label") }}
+                            {{ form.start_date(class="form-control", type="date") }}
+                            {% for error in form.start_date.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.end_date.label(class="form-label") }}
+                            {{ form.end_date(class="form-control", type="date") }}
+                            {% for error in form.end_date.errors %}
+                                <div class="invalid-feedback d-block">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        {{ form.total_budget.label(class="form-label") }}
+                        <div class="input-group">
+                            <span class="input-group-text">£</span>
+                            {{ form.total_budget(class="form-control") }}
+                        </div>
+                        {% for error in form.total_budget.errors %}
+                            <div class="invalid-feedback d-block">{{ error }}</div>
+                        {% endfor %}
+                        <div class="form-text">Optional. Set a budget for your trip to help with planning.</div>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Cancel</a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8 offset-md-2">
+        <div class="card shadow-sm">
+            <div class="card-header bg-info text-white">
+                <h4 class="mb-0">Looking for inspiration?</h4>
+            </div>
+            <div class="card-body">
+                <p>Let AI help you plan your perfect trip based on your preferences.</p>
+                <a href="{{ url_for('main.ai_itinerary_form') }}" class="btn btn-outline-info">
+                    <i class="fas fa-robot me-2"></i> Try our AI Trip Planner
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

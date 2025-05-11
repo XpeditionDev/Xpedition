@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Flight Saved Successfully!</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success mb-4">
+                        <h5 class="alert-heading">Great choice!</h5>
+                        <p>Your flight has been saved to your "{{ itinerary.name }}" itinerary.</p>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Flight Details</h5>
+                        </div>
+                        <div class="card-body">
+                            {% for segment in flight.segments %}
+                            <div class="mb-4">
+                                <h6 class="mb-3">
+                                    {% if loop.index == 1 %}
+                                        <span class="badge bg-primary">Outbound</span>
+                                    {% elif loop.index == flight.segments|length and flight.segments|length > 2 %}
+                                        <span class="badge bg-info">Final Connection</span>
+                                    {% elif loop.index == flight.segments|length %}
+                                        <span class="badge bg-primary">Return</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Connection</span>
+                                    {% endif %}
+                                    Flight {{ loop.index }} of {{ flight.segments|length }}
+                                </h6>
+                                <p><strong>Flight Number:</strong> {{ segment.carrierCode }} {{ segment.number }}</p>
+                                <p><strong>From:</strong> {{ segment.departure.iataCode }}</p>
+                                <p><strong>To:</strong> {{ segment.arrival.iataCode }}</p>
+                                <p><strong>Departure:</strong> {{ segment.departure.at|replace('T', ' ')|replace('Z', '') }}</p>
+                                <p><strong>Arrival:</strong> {{ segment.arrival.at|replace('T', ' ')|replace('Z', '') }}</p>
+                                {% if not loop.last %}
+                                <hr>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                            <p class="mt-4"><strong>Total Price:</strong> {{ flight.price.currency }} {{ flight.price.total }}</p>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <p class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You can now proceed to book your flight directly with the airline using this link:
+                            <a href="{{ booking_url }}" target="_blank" class="alert-link">Book Now</a>
+                        </p>
+                        <p class="small text-muted mt-2">Debug - URL: {{ booking_url }}</p>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+                        <a href="{{ url_for('main.search_flights') }}" class="btn btn-outline-primary me-md-2">
+                            <i class="fas fa-search me-2"></i>Search More Flights
+                        </a>
+                        <a href="{{ url_for('main.itinerary_detail', itinerary_id=itinerary.id) }}" class="btn btn-outline-success">
+                            <i class="fas fa-map-marked-alt me-2"></i>View Itinerary
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

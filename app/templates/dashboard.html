@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+    <h1>Welcome, {{ current_user.username }}!</h1>
+    <div class="dashboard-actions">
+        <a href="{{ url_for('main.search_flights') }}" class="action-button">Search Flights</a>
+        <a href="{{ url_for('main.plan_holiday') }}" class="action-button">Plan Holiday</a>
+    </div>
+{% endblock %} 

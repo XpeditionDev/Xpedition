@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% set active_page = "activities" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="fas fa-hiking me-2"></i>Activity Search</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">How this works:</h5>
+                        <p>Search for activities below. When you find an activity you like, click "Save to Itinerary" to add it to your trip plan.</p>
+                    </div>
+                    
+                    <!-- Error message display -->
+                    {% if error_message %}
+                    <div class="alert alert-danger mb-4">
+                        <h5 class="alert-heading">Error:</h5>
+                        <p>{{ error_message }}</p>
+                    </div>
+                    {% endif %}
+                    
+                    <form method="POST" action="{{ url_for('main.activity_search') }}">
+                        {{ form.csrf_token }}
+                        <div class="row g-3">
+                            <div class="col-md-5">
+                                <div class="form-group">
+                                    {{ form.location.label(class="form-label") }}
+                                    {{ form.location(class="form-control", placeholder="e.g. London") }}
+                                    {% if form.location.errors %}
+                                        {% for error in form.location.errors %}
+                                            <span class="text-danger">{{ error }}</span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="form-group">
+                                    {{ form.date.label(class="form-label") }}
+                                    {{ form.date(class="form-control", required=true) }}
+                                    {% if form.date.errors %}
+                                        {% for error in form.date.errors %}
+                                            <span class="text-danger">{{ error }}</span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
+                                    {{ form.category.label(class="form-label") }}
+                                    {{ form.category(class="form-control", placeholder="e.g. sightseeing, food, culture") }}
+                                    {% if form.category.errors %}
+                                        {% for error in form.category.errors %}
+                                            <span class="text-danger">{{ error }}</span>
+                                        {% endfor %}
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {{ form.submit(class="btn btn-primary mt-3") }}
+                    </form>
+                </div>
+            </div>
+
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-info mt-3">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+
+            {% if activities %}
+                <div class="card shadow mt-4">
+                    <div class="card-header bg-success text-white">
+                        <h3 class="mb-0">Available Activities</h3>
+                        <p class="mb-0">
+                            {% if search_params %}
+                            Location: {{ search_params.location }}
+                            {% if search_params.date %}
+                            | Date: {{ search_params.date }}
+                            {% endif %}
+                            {% if search_params.category %}
+                            | Category: {{ search_params.category }}
+                            {% endif %}
+                            {% endif %}
+                        </p>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for activity in activities %}
+                            <div class="col-md-6 col-lg-4 mb-4">
+                                <div class="card h-100">
+                                    <div class="card-header">
+                                        <h5 class="card-title mb-0">{{ activity.name }}</h5>
+                                    </div>
+                                    <div class="card-body">
+                                        <p class="card-text">{{ activity.description }}</p>
+                                        <div class="mb-2">
+                                            <span class="badge bg-info">
+                                                <i class="fas fa-clock me-1"></i>{{ activity.duration }} minutes
+                                            </span>
+                                            {% if activity.price %}
+                                            <span class="badge bg-success ms-1">
+                                                <i class="fas fa-tag me-1"></i>{{ activity.price.currency }} {{ activity.price.amount }}
+                                            </span>
+                                            {% endif %}
+                                            {% if activity.category %}
+                                            <span class="badge bg-secondary ms-1">
+                                                <i class="fas fa-list me-1"></i>{{ activity.category }}
+                                            </span>
+                                            {% endif %}
+                                        </div>
+                                        <p class="small text-muted">
+                                            <i class="fas fa-map-marker-alt me-1"></i>{{ activity.location }}
+                                        </p>
+                                        {% if activity.rating %}
+                                        <div class="mb-2">
+                                            <span class="text-warning">
+                                                {% for i in range(5) %}
+                                                    {% if i < activity.rating|int %}
+                                                    <i class="fas fa-star"></i>
+                                                    {% elif i < activity.rating %}
+                                                    <i class="fas fa-star-half-alt"></i>
+                                                    {% else %}
+                                                    <i class="far fa-star"></i>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </span>
+                                            <span class="ms-2 text-muted">{{ activity.rating }} ({{ activity.reviews_count }} reviews)</span>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="card-footer">
+                                        <a href="{{ url_for('main.save_activity_to_itinerary', activity_id=activity.id) }}" class="btn btn-primary btn-sm w-100">
+                                            <i class="fas fa-save me-1"></i>Save to Itinerary
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum date to today for activity date
+    const today = new Date().toISOString().split('T')[0];
+    const dateInput = document.getElementById('date');
+    
+    if (dateInput) {
+        dateInput.min = today;
+    }
+});
+</script>
+{% endblock %} 

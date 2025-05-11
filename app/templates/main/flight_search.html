@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+{% set active_page = "flights" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0"><i class="fas fa-plane me-2"></i>Flight Search</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info mb-4">
+                        <h5 class="alert-heading">How this works:</h5>
+                        <p>Search for flights below. When you find a flight you like, click "Save to Itinerary" to add it to your trip plan. You'll then get a link to book the flight directly with the airline or travel partner.</p>
+                    </div>
+                    
+                    <form method="POST" action="{{ url_for('main.search_flights') }}">
+                        {{ form.hidden_tag() }}
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    {{ form.origin.label(class="form-label") }}
+                                    {{ form.origin(class="form-control", placeholder="City or Airport Code (e.g. LON, LHR)") }}
+                                    {% if form.origin.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.origin.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Enter city or airport code (e.g., LON or LHR for London)</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-group">
+                                    {{ form.destination.label(class="form-label") }}
+                                    {{ form.destination(class="form-control", placeholder="City or Airport Code (e.g. PAR, CDG)") }}
+                                    {% if form.destination.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.destination.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Enter city or airport code (e.g., PAR or CDG for Paris)</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <div class="form-group">
+                                    {{ form.departure_date.label(class="form-label") }}
+                                    {{ form.departure_date(class="form-control", type="date") }}
+                                    {% if form.departure_date.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.departure_date.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-group">
+                                    {{ form.return_date.label(class="form-label") }}
+                                    {{ form.return_date(class="form-control", type="date") }}
+                                    {% if form.return_date.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.return_date.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    <small class="form-text text-muted">Leave blank for one-way flights</small>
+                                </div>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <div class="form-group">
+                                    {{ form.adults.label(class="form-label") }}
+                                    {{ form.adults(class="form-control") }}
+                                    {% if form.adults.errors %}
+                                        <div class="invalid-feedback d-block">
+                                            {% for error in form.adults.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-grid gap-2 mt-3">
+                            {{ form.submit(class="btn btn-primary btn-lg") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if flights %}
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0"><i class="fas fa-list me-2"></i>Available Flights</h3>
+                </div>
+                <div class="card-body">
+                    {% if flights.status == 'success' %}
+                        {% if flights.flights|length > 0 %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Airline</th>
+                                            <th>Flight</th>
+                                            <th>Departure</th>
+                                            <th>Arrival</th>
+                                            <th>Duration</th>
+                                            <th>Price</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for flight in flights.flights %}
+                                        <tr>
+                                            <td>
+                                                {% if flight.segments|length == 1 %}
+                                                    <span class="badge bg-success">Direct</span>
+                                                {% else %}
+                                                    <span class="badge bg-warning">Connection</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ flight.segments[0].carrierCode }}</td>
+                                            <td>{{ flight.segments[0].number }}</td>
+                                            <td>
+                                                <strong>{{ flight.segments[0].departure.iataCode }}</strong>
+                                                <br>
+                                                <small>{{ flight.segments[0].departure.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                            </td>
+                                            <td>
+                                                <strong>{{ flight.segments[0].arrival.iataCode }}</strong>
+                                                <br>
+                                                <small>{{ flight.segments[0].arrival.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                            </td>
+                                            <td>{{ flight.segments[0].duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</td>
+                                            <td>
+                                                <strong class="text-success">
+                                                    {{ flight.price.currency }} {{ flight.price.total }}
+                                                </strong>
+                                            </td>
+                                            <td>
+                                                <a href="{{ url_for('main.book_flight', flight_id=flight.id) }}" class="btn btn-sm btn-primary">
+                                                    Save to Itinerary
+                                                </a>
+                                            </td>
+                                        </tr>
+                                        {% if flight.segments|length > 1 %}
+                                        <tr class="table-light">
+                                            <td>
+                                                {% if flight.segments[1].departure.iataCode == flight.segments[0].arrival.iataCode %}
+                                                    <span class="badge bg-info">Connection</span>
+                                                {% else %}
+                                                    <span class="badge bg-primary">Return</span>
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ flight.segments[1].carrierCode }}</td>
+                                            <td>{{ flight.segments[1].number }}</td>
+                                            <td>
+                                                <strong>{{ flight.segments[1].departure.iataCode }}</strong>
+                                                <br>
+                                                <small>{{ flight.segments[1].departure.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                            </td>
+                                            <td>
+                                                <strong>{{ flight.segments[1].arrival.iataCode }}</strong>
+                                                <br>
+                                                <small>{{ flight.segments[1].arrival.at|replace('T', ' ')|replace('Z', '') }}</small>
+                                            </td>
+                                            <td>{{ flight.segments[1].duration|replace('PT', '')|replace('H', 'h ')|replace('M', 'm') }}</td>
+                                            <td colspan="2" class="text-center">
+                                                <em>Return Flight</em>
+                                            </td>
+                                        </tr>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>No flights found for your search criteria. Please try different dates or destinations.
+                            </div>
+                        {% endif %}
+                    {% else %}
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-triangle me-2"></i>Error: {{ flights.message }}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %} 

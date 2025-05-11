@@ -1,0 +1,161 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, current_app as app
+from flask_login import login_required, current_user
+from app.models import Itinerary, Activity, Accommodation, Flight, Destination
+from app import db
+import json
+from datetime import datetime, timedelta
+
+main_bp = Blueprint('main', __name__)
+
+@main_bp.route('/')
+def index():
+    """Home page route"""
+    return render_template('main/index.html')
+
+@main_bp.route('/dashboard')
+@login_required
+def dashboard():
+    """User dashboard showing their itineraries"""
+    itineraries = Itinerary.query.filter_by(user_id=current_user.id).all()
+    return render_template('main/dashboard.html', itineraries=itineraries)
+
+@main_bp.route('/create-itinerary', methods=['GET', 'POST'])
+@login_required
+def create_itinerary():
+    """Create a new itinerary"""
+    if request.method == 'POST':
+        name = request.form.get('name')
+        start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d')
+        end_date = datetime.strptime(request.form.get('end_date'), '%Y-%m-%d')
+        
+        itinerary = Itinerary(
+            name=name,
+            user_id=current_user.id,
+            start_date=start_date,
+            end_date=end_date,
+            total_budget=float(request.form.get('budget', 0))
+        )
+        
+        db.session.add(itinerary)
+        db.session.commit()
+        
+        flash('Itinerary created successfully!', 'success')
+        return redirect(url_for('main.view_itinerary', itinerary_id=itinerary.id))
+    
+    return render_template('main/create_itinerary.html')
+
+@main_bp.route('/itinerary/<int:itinerary_id>')
+@login_required
+def view_itinerary(itinerary_id):
+    """View a specific itinerary"""
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    
+    # Ensure the user owns this itinerary
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to view this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    activities = Activity.query.filter_by(itinerary_id=itinerary_id).all()
+    accommodations = Accommodation.query.filter_by(itinerary_id=itinerary_id).all()
+    flights = Flight.query.filter_by(itinerary_id=itinerary_id).all()
+    destinations = Destination.query.filter_by(itinerary_id=itinerary_id).all()
+    
+    return render_template(
+        'main/itinerary_detail.html',
+        itinerary=itinerary,
+        activities=activities,
+        accommodations=accommodations,
+        flights=flights,
+        destinations=destinations
+    )
+
+@main_bp.route('/ai-itinerary', methods=['GET'])
+def ai_itinerary_form():
+    """Show the AI itinerary generation form"""
+    return render_template('main/ai_itinerary.html')
+
+@main_bp.route('/generate-ai-itinerary', methods=['GET', 'POST'])
+def generate_ai_itinerary():
+    """Generate an AI-powered itinerary based on user preferences"""
+    if request.method == 'POST':
+        try:
+            form = request.form
+            
+            # Extract preferences from the form
+            preferences = {
+                'destination': form.get('destination'),
+                'duration': int(form.get('duration', 5)),
+                'budget': float(form.get('budget', 2000)),
+                'interests': form.getlist('interests')
+            }
+            
+            # Initialize the AI planner
+            from app.utils.ai_planner import ItineraryGenerator
+            generator = ItineraryGenerator()
+            
+            # Generate the itinerary with named parameters
+            ai_itinerary = generator.generate_itinerary(
+                destination=preferences.get('destination'),
+                duration_days=int(preferences.get('duration', 5)),
+                budget=float(preferences.get('budget', 2000)),
+                interests_text=", ".join(preferences.get('interests', []))
+            )
+            
+            # Save the itinerary to the database
+            if current_user.is_authenticated:
+                generator.save_itinerary_to_db(current_user.id, ai_itinerary)
+            
+            return jsonify(ai_itinerary)
+        except Exception as e:
+            app.logger.error(f"Error generating AI itinerary: {str(e)}")
+            return jsonify({'error': 'An error occurred while creating your AI itinerary'}), 500
+    
+    return render_template('main/ai_itinerary.html')
+
+@main_bp.route('/edit-itinerary/<int:itinerary_id>', methods=['GET', 'POST'])
+@login_required
+def edit_itinerary(itinerary_id):
+    """Edit an existing itinerary"""
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    
+    # Ensure the user owns this itinerary
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to edit this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    if request.method == 'POST':
+        itinerary.name = request.form.get('name')
+        itinerary.start_date = datetime.strptime(request.form.get('start_date'), '%Y-%m-%d')
+        itinerary.end_date = datetime.strptime(request.form.get('end_date'), '%Y-%m-%d')
+        itinerary.total_budget = float(request.form.get('budget', 0))
+        
+        db.session.commit()
+        
+        flash('Itinerary updated successfully!', 'success')
+        return redirect(url_for('main.view_itinerary', itinerary_id=itinerary.id))
+    
+    return render_template('main/edit_itinerary.html', itinerary=itinerary)
+
+@main_bp.route('/delete-itinerary/<int:itinerary_id>', methods=['POST'])
+@login_required
+def delete_itinerary(itinerary_id):
+    """Delete an itinerary"""
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    
+    # Ensure the user owns this itinerary
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to delete this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    # Delete related records
+    Activity.query.filter_by(itinerary_id=itinerary_id).delete()
+    Accommodation.query.filter_by(itinerary_id=itinerary_id).delete()
+    Flight.query.filter_by(itinerary_id=itinerary_id).delete()
+    Destination.query.filter_by(itinerary_id=itinerary_id).delete()
+    
+    # Delete the itinerary
+    db.session.delete(itinerary)
+    db.session.commit()
+    
+    flash('Itinerary deleted successfully!', 'success')
+    return redirect(url_for('main.dashboard'))

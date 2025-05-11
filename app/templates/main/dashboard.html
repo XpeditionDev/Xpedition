@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}My Itineraries{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>My Itineraries</h1>
+        <div>
+            <a href="{{ url_for('main.create_itinerary') }}" class="btn btn-primary">Create New Itinerary</a>
+            <a href="{{ url_for('main.ai_itinerary_form') }}" class="btn btn-outline-primary">AI Itinerary Generator</a>
+        </div>
+    </div>
+    
+    {% if itineraries %}
+        <div class="row">
+            {% for itinerary in itineraries %}
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header {% if itinerary.is_ai_generated %}bg-info text-white{% endif %}">
+                            <h5 class="card-title mb-0">{{ itinerary.name }}</h5>
+                            {% if itinerary.is_ai_generated %}
+                                <span class="badge bg-light text-dark">AI Generated</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Dates:</strong> {{ itinerary.start_date.strftime('%Y-%m-%d') }} to {{ itinerary.end_date.strftime('%Y-%m-%d') }}</p>
+                            <p><strong>Duration:</strong> {{ (itinerary.end_date - itinerary.start_date).days }} days</p>
+                            <p><strong>Budget:</strong> {% if itinerary.total_budget %}£{{ "%.2f"|format(itinerary.total_budget) }}{% else %}Not set{% endif %}</p>
+                            
+                            {% if itinerary.destinations and itinerary.destinations|length > 0 %}
+                                <p><strong>Destination:</strong> {{ itinerary.destinations[0].name }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="card-footer">
+                            <a href="{{ url_for('main.view_itinerary', itinerary_id=itinerary.id) }}" class="btn btn-primary btn-sm">View Details</a>
+                            <a href="{{ url_for('main.edit_itinerary', itinerary_id=itinerary.id) }}" class="btn btn-outline-secondary btn-sm">Edit</a>
+                            <button class="btn btn-outline-danger btn-sm" onclick="confirmDelete({{ itinerary.id }})">Delete</button>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <p>You don't have any itineraries yet.</p>
+            <p>Get started by <a href="{{ url_for('main.create_itinerary') }}">creating a new itinerary</a> or using our <a href="{{ url_for('main.ai_itinerary_form') }}">AI Itinerary Generator</a>.</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirm Deletion</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete this itinerary? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="deleteForm" method="POST">
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(itineraryId) {
+    const deleteForm = document.getElementById('deleteForm');
+    deleteForm.action = `/delete-itinerary/${itineraryId}`;
+    
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    deleteModal.show();
+}
+</script>
+{% endblock %}

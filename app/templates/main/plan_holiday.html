@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <h1 class="mb-4">Plan Your Holiday</h1>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Trip Details</h2>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Trip Name</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="start_date" class="form-label">Start Date</label>
+                                <input type="date" class="form-control" id="start_date" name="start_date" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="end_date" class="form-label">End Date</label>
+                                <input type="date" class="form-control" id="end_date" name="end_date" required>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="total_budget" class="form-label">Total Budget (£)</label>
+                        <input type="number" class="form-control" id="total_budget" name="total_budget" min="0" step="0.01">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Create Trip</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2 class="h5 mb-0">AI Trip Planner</h2>
+            </div>
+            <div class="card-body">
+                <p>Let our AI help you plan the perfect trip based on your preferences!</p>
+                <button class="btn btn-success w-100" onclick="alert('AI Trip Planner coming soon!')">
+                    <i class="fas fa-robot me-2"></i> Generate AI Plan
+                </button>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h2 class="h5 mb-0">Popular Destinations</h2>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <i class="fas fa-map-marker-alt me-2"></i> Barcelona, Spain
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <i class="fas fa-map-marker-alt me-2"></i> Paris, France
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <i class="fas fa-map-marker-alt me-2"></i> Rome, Italy
+                    </a>
+                    <a href="#" class="list-group-item list-group-item-action">
+                        <i class="fas fa-map-marker-alt me-2"></i> Amsterdam, Netherlands
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

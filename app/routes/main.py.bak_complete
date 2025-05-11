@@ -1,0 +1,1845 @@
+from flask import Blueprint, render_template, redirect, url_for, flash, request, jsonify, session, current_app, make_response
+from flask_login import login_required, current_user
+from app import db
+from app.models import Itinerary, UserSettings, Flight, Destination, Activity, Accommodation, FlightBooking, HotelBooking
+from app.utils.api_client import get_api_client
+from app.utils.ai_planner import ItineraryGenerator
+from datetime import datetime, timedelta
+import traceback
+import json
+import random
+import string
+from app.forms.search import FlightSearchForm, HotelSearchForm, ActivitySearchForm
+from app.forms.itinerary import ItineraryForm, FlightForm, AccommodationForm, ActivityForm, AiItineraryForm
+from app.forms.user import ProfileForm, PasswordChangeForm, SettingsForm, BookingForm
+from app.utils.flight_api import FlightAPIClient
+from app.utils.hotel_api import HotelAPIClient
+import os
+import secrets
+from PIL import Image
+from werkzeug.utils import secure_filename
+from app.utils.binary_search import binary_search_flights_by_price, linear_search_flights_by_price, compare_search_algorithms
+from app.utils.neural_recommender import NeuralRecommender
+
+main_bp = Blueprint('main', __name__)
+
+@main_bp.route('/')
+def index():
+    # Debug code to verify environment variables - will be visible in console
+    print("\n===== CHECKING ENVIRONMENT VARIABLES =====")
+    rapidapi_key = os.environ.get('RAPIDAPI_KEY', 'NOT SET')
+    if rapidapi_key != 'NOT SET':
+        masked_key = rapidapi_key[:6] + '*' * (len(rapidapi_key) - 10) + rapidapi_key[-4:] if len(rapidapi_key) > 10 else "INVALID (TOO SHORT)"
+        print(f"RAPIDAPI_KEY is set to: {masked_key}")
+    else:
+        print("RAPIDAPI_KEY is NOT SET in environment variables")
+    print("========================================\n")
+    
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+    return render_template('main/landing.html', title='Welcome to Xpedition')
+
+@main_bp.route('/dashboard')
+@login_required
+def dashboard():
+    itineraries = Itinerary.query.filter_by(user_id=current_user.id).order_by(Itinerary.start_date.desc()).all()
+    return render_template('main/dashboard.html', title='Dashboard', itineraries=itineraries)
+
+@main_bp.route('/plan-holiday', methods=['GET', 'POST'])
+@login_required
+def plan_holiday():
+    if request.method == 'POST':
+        try:
+            # Get form data
+            name = request.form.get('name')
+            start_date = request.form.get('start_date')
+            end_date = request.form.get('end_date')
+            total_budget = request.form.get('total_budget')
+            
+            print(f"Form data received: name={name}, start_date={start_date}, end_date={end_date}, total_budget={total_budget}")
+            
+            # Validate required fields
+            if not all([name, start_date, end_date]):
+                flash('Please fill in all required fields')
+                return render_template('main/plan_holiday.html', title='Plan Holiday')
+            
+            # Convert dates from string to datetime
+            start_date = datetime.strptime(start_date, '%Y-%m-%d')
+            end_date = datetime.strptime(end_date, '%Y-%m-%d')
+            
+            # Validate dates
+            if start_date > end_date:
+                flash('Start date cannot be after end date')
+                return render_template('main/plan_holiday.html', title='Plan Holiday')
+            
+            # Convert budget to float if provided
+            total_budget = float(total_budget) if total_budget else None
+            
+            # Create new itinerary
+            itinerary = Itinerary(
+                name=name,
+                start_date=start_date,
+                end_date=end_date,
+                total_budget=total_budget,
+                user_id=current_user.id
+
+            
+            print("Created itinerary object:", itinerary)
+            
+            db.session.add(itinerary)
+            db.session.commit()
+            
+            flash('Trip created successfully!')
+            return redirect(url_for('main.dashboard'))
+            
+        except ValueError as e:
+            print(f"ValueError in plan_holiday: {str(e)}")
+            print(traceback.format_exc())
+            flash('Please enter valid dates and budget amount')
+            return render_template('main/plan_holiday.html', title='Plan Holiday')
+            
+        except Exception as e:
+            print(f"Error in plan_holiday: {str(e)}")
+            print(traceback.format_exc())
+            db.session.rollback()
+            flash('An error occurred while creating your trip')
+            return render_template('main/plan_holiday.html', title='Plan Holiday')
+            
+    return render_template('main/plan_holiday.html', title='Plan Holiday')
+
+@main_bp.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile():
+    profile_form = ProfileForm()
+    password_form = PasswordChangeForm()
+    
+    if profile_form.validate_on_submit() and 'update_profile' in request.form:
+        try:
+            # Handle username and email updates
+            current_user.username = profile_form.username.data
+            current_user.email = profile_form.email.data
+            
+            # Handle profile picture upload
+            if profile_form.profile_picture.data:
+                picture_file = save_profile_picture(profile_form.profile_picture.data)
+                current_user.profile_picture = picture_file
+            
+            db.session.commit()
+            flash('Your profile has been updated successfully!', 'success')
+            return redirect(url_for('main.profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Profile update error: {str(e)}")
+            print(traceback.format_exc())
+            flash('An error occurred while updating your profile.', 'danger')
+    
+    elif password_form.validate_on_submit() and 'change_password' in request.form:
+        try:
+            current_user.set_password(password_form.new_password.data)
+            db.session.commit()
+            flash('Your password has been updated successfully!', 'success')
+            return redirect(url_for('main.profile'))
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Password change error: {str(e)}")
+            print(traceback.format_exc())
+            flash('An error occurred while changing your password.', 'danger')
+    
+    # Pre-populate form fields
+    if request.method == 'GET':
+        profile_form.username.data = current_user.username
+        profile_form.email.data = current_user.email
+    
+    return render_template('main/profile.html', 
+                          title='My Profile',
+                          profile_form=profile_form,
+                          password_form=password_form)
+
+@main_bp.route('/settings', methods=['GET', 'POST'])
+@login_required
+def settings():
+    form = SettingsForm()
+    
+    # Populate form with current settings
+    if request.method == 'GET' and current_user.settings:
+        form.theme.data = current_user.settings.theme
+        form.font_size.data = current_user.settings.font_size
+        form.notifications_enabled.data = current_user.settings.notifications_enabled
+        form.language.data = current_user.settings.language if current_user.settings.language else 'en'
+    
+    # Handle AJAX requests separately
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    
+    if request.method == 'POST':
+        if is_ajax:
+            # Get form data from request
+            theme = request.form.get('theme', 'light')
+            font_size = request.form.get('font_size', 'medium')
+            notifications_enabled = request.form.get('notifications_enabled', 'false') == 'true'
+            language = request.form.get('language', 'en')
+            
+            try:
+                # Create settings if they don't exist
+                if not current_user.settings:
+                    print("Creating new UserSettings")
+                    user_settings = UserSettings(
+                        user_id=current_user.id,
+                        theme=theme,
+                        font_size=font_size,
+                        notifications_enabled=notifications_enabled,
+                        language=language,
+                        updated_at=datetime.utcnow()
+                    )
+                    db.session.add(user_settings)
+                    db.session.commit()
+                    current_user.settings = user_settings
+                else:
+                    print("Updating existing UserSettings")
+                    current_user.settings.theme = theme
+                    current_user.settings.font_size = font_size
+                    current_user.settings.notifications_enabled = notifications_enabled
+                    current_user.settings.language = language
+                    current_user.settings.updated_at = datetime.utcnow()
+                    db.session.commit()
+                
+                # Force a refresh of the current_user object
+                db.session.refresh(current_user)
+                
+                return jsonify({
+                    'success': True,
+                    'message': 'Settings updated successfully'
+                })
+                
+            except Exception as e:
+                print(f"Error in settings: {str(e)}")
+                print(traceback.format_exc())
+                db.session.rollback()
+                return jsonify({
+                    'success': False,
+                    'message': 'An error occurred while updating settings'
+                })
+                
+        elif form.validate_on_submit():
+            try:
+                # Get form data
+                theme = form.theme.data
+                font_size = form.font_size.data
+                notifications_enabled = form.notifications_enabled.data
+                language = form.language.data
+                
+                print(f"Settings form data: theme={theme}, font_size={font_size}, notifications_enabled={notifications_enabled}, language={language}")
+                
+                # Create settings if they don't exist
+                if not current_user.settings:
+                    print("Creating new UserSettings")
+                    user_settings = UserSettings(
+                        user_id=current_user.id,
+                        theme=theme,
+                        font_size=font_size,
+                        notifications_enabled=notifications_enabled,
+                        language=language,
+                        updated_at=datetime.utcnow()
+                    )
+                    db.session.add(user_settings)
+                    db.session.commit()
+                    current_user.settings = user_settings
+                else:
+                    print("Updating existing UserSettings")
+                    current_user.settings.theme = theme
+                    current_user.settings.font_size = font_size
+                    current_user.settings.notifications_enabled = notifications_enabled
+                    current_user.settings.language = language
+                    current_user.settings.updated_at = datetime.utcnow()
+                    db.session.commit()
+                
+                # Force a refresh of the current_user object
+                db.session.refresh(current_user)
+                
+                flash('Settings updated successfully')
+                return redirect(url_for('main.settings'))
+                
+            except Exception as e:
+                print(f"Error in settings: {str(e)}")
+                print(traceback.format_exc())
+                db.session.rollback()
+                flash('An error occurred while updating settings')
+    
+    return render_template('main/settings.html', title='Settings', form=form)
+
+@main_bp.route('/search-flights', methods=['GET', 'POST'])
+def search_flights():
+    form = FlightSearchForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Extract and validate form data
+            if not form.origin.data or not form.destination.data or not form.departure_date.data:
+                flash('Please fill in all required fields.')
+                return render_template('main/search_flights.html', title='Flight Search', form=form)
+            
+            # Extract form data (now we know they're not None)
+            origin = form.origin.data.upper()
+            destination = form.destination.data.upper()
+            departure_date = form.departure_date.data
+            return_date = form.return_date.data
+            
+            # Default to 1 adult if form doesn't have adults field
+            adults = form.adults.data if hasattr(form, 'adults') and form.adults.data is not None else 1
+            
+            print(f"Search parameters:")
+            print(f"Origin: {origin}")
+            print(f"Destination: {destination}")
+            print(f"Departure date: {departure_date}")
+            print(f"Return date: {return_date}")
+            print(f"Adults: {adults}")
+            
+            # Get API client and search for flights
+            api_client = get_api_client()
+            flight_results = api_client.search_flights(
+                origin=origin, 
+                destination=destination, 
+                departure_date=departure_date,  # This is already a datetime object from the form
+                return_date=return_date,       # This is already a datetime object from the form
+                adults=adults
+            )
+            
+            if not flight_results or flight_results.get('status') != 'success':
+                error_msg = flight_results.get('message', 'No flights found for the selected criteria.') if flight_results else 'No flights found.'
+                flash(error_msg)
+                return render_template('main/search_flights.html', title='Flight Search', form=form)
+            
+            # Save search results to session for later booking
+            session['flight_search_results'] = flight_results
+            
+            # Also save search parameters
+            session['flight_search'] = {
+                'origin': origin,
+                'destination': destination,
+                'departure_date': departure_date.strftime('%Y-%m-%d'),
+                'return_date': return_date.strftime('%Y-%m-%d') if return_date else None,
+                'adults': adults
+            }
+            
+            return render_template('main/search_flights.html', 
+                                title='Flight Results', 
+                                form=form,
+                                flights=flight_results, 
+                                search_params=session['flight_search'])
+            
+        except Exception as e:
+            print(f"Error in search_flights: {str(e)}")
+            print(traceback.format_exc())
+            flash('An error occurred while searching for flights.')
+    
+    return render_template('main/search_flights.html', title='Flight Search', form=form)
+
+@main_bp.route('/save-flight', methods=['POST'])
+@login_required
+def save_flight():
+    try:
+        # Get the flight data from the request
+        if request.is_json:
+            data = request.get_json()
+        else:
+            flight_data_str = request.form.get('flight_data')
+            if not flight_data_str:
+                return jsonify({'success': False, 'error': 'No flight data provided'}), 400
+            data = json.loads(flight_data_str)
+        
+        print("Received flight data:", data)
+        
+        # Get the itinerary ID from the request
+        itinerary_id = request.form.get('itinerary_id')
+        if not itinerary_id:
+            return jsonify({'success': False, 'error': 'No itinerary selected'})
+        
+        # Handle new itinerary creation
+        if itinerary_id == 'new':
+            new_itinerary_name = request.form.get('new_itinerary_name')
+            if not new_itinerary_name:
+                return jsonify({'success': False, 'error': 'No name provided for new itinerary'})
+            
+            # Create a new itinerary
+            itinerary = Itinerary(
+                name=new_itinerary_name,
+                user_id=current_user.id,
+                start_date=datetime.now(),
+                end_date=datetime.now()
+            )
+            db.session.add(itinerary)
+            db.session.commit()
+            itinerary_id = itinerary.id
+        else:
+            # Verify the itinerary belongs to the current user
+            itinerary = Itinerary.query.get(itinerary_id)
+            if not itinerary or itinerary.user_id != current_user.id:
+                return jsonify({'success': False, 'error': 'Invalid itinerary'})
+        
+        # Handle different data structures
+        if 'outbound' in data:
+            # New format with outbound structure
+            outbound = data['outbound']
+            departure_airport = outbound['departure']['airport']
+            arrival_airport = outbound['arrival']['airport']
+            departure_time = datetime.fromisoformat(outbound['departure']['time'].replace('Z', '+00:00'))
+            arrival_time = datetime.fromisoformat(outbound['arrival']['time'].replace('Z', '+00:00'))
+            airline = data['airline']
+            price = data['price']['total'] if isinstance(data['price'], dict) else data['price']
+            booking_reference = data.get('booking_reference', '')
+        else:
+            # Old format with flat structure
+            departure_airport = data['departure']['airport'] if 'departure' in data and 'airport' in data['departure'] else None
+            arrival_airport = data['arrival']['airport'] if 'arrival' in data and 'airport' in data['arrival'] else None
+            departure_time = None
+            arrival_time = None
+            if 'departure' in data and 'time' in data['departure']:
+                try:
+                    departure_time = datetime.fromisoformat(data['departure']['time'].replace('Z', '+00:00'))
+                except:
+                    print("Error parsing departure time")
+            if 'arrival' in data and 'time' in data['arrival']:
+                try:
+                    arrival_time = datetime.fromisoformat(data['arrival']['time'].replace('Z', '+00:00'))
+                except:
+                    print("Error parsing arrival time")
+            airline = data.get('airline', '')
+            price = data.get('price', {})
+            if isinstance(price, dict):
+                price = price.get('total', 0)
+            booking_reference = data.get('booking_reference', '')
+        
+        # Create new flight record
+        total_cost = float(price) if price else 0
+        segments_count = len(data['segments'])
+        cost_per_segment = total_cost / segments_count  # Divide total cost among segments
+        
+        # Generate a unique connection group ID if multiple segments
+        connection_group = f"CONN-{datetime.now().strftime('%Y%m%d%H%M%S')}-{current_user.id}"
+        is_connection = segments_count > 1
+        
+        # Save each flight segment
+        for i, segment in enumerate(data['segments']):
+            flight = Flight(
+                itinerary_id=itinerary_id,
+                departure_airport=segment['departure']['iataCode'],
+                arrival_airport=segment['arrival']['iataCode'],
+                departure_time=datetime.strptime(
+                    segment['departure']['at'].replace('Z', ''), 
+                    '%Y-%m-%dT%H:%M:%S'
+                arrival_time=datetime.strptime(
+                    segment['arrival']['at'].replace('Z', ''), 
+                    '%Y-%m-%dT%H:%M:%S'
+                ),
+                airline=segment['carrierCode'],
+                flight_number=segment['number'],
+                cost=cost_per_segment,  # Split cost evenly among segments
+                is_connection=is_connection,
+                connection_group=connection_group if is_connection else None,
+                segment_order=i,
+                duration=segment.get('duration', '')
+            )
+            db.session.add(flight)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Flight saved successfully',
+            'flight_id': flight.id,
+            'redirect': url_for('main.dashboard')
+        })
+        
+    except Exception as e:
+        print(f"Error in save_flight: {str(e)}")
+        print(traceback.format_exc())
+        db.session.rollback()
+        return jsonify({'success': False, 'error': 'An error occurred while saving the flight'})
+
+@main_bp.route('/ai-planner', methods=['GET', 'POST'])
+@login_required
+def ai_planner():
+    form = AiItineraryForm()
+    
+    if form.validate_on_submit():
+        try:
+            # Initialize the AI itinerary generator
+            generator = ItineraryGenerator()
+            
+            # Generate an AI itinerary based on form inputs
+            ai_itinerary = generator.generate_itinerary(
+    destination=form.destination.data,
+    duration_days=int(form.duration.data),
+    budget=float(form.budget.data),
+    interests_text=", ".join(form.interests.data)
+),
+    budget=float(form.budget.data),
+    interests_text=", ".join(form.interests.data)
+),
+        budget=float(form.budget.data),
+        interests_text=", ".join(form.interests.data)
+    )
+                budget=2000,
+                interests_text="sightseeing, culture"
+            )
+            
+            # Save the AI-generated itinerary to the database
+            itinerary_id = generator.save_itinerary_to_db(current_user.id, ai_itinerary)
+            
+            flash('Your AI-generated itinerary has been created successfully!')
+            return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+        
+        except Exception as e:
+            flash(f'An error occurred while generating your itinerary: {str(e)}')
+            return redirect(url_for('main.ai_planner'))
+    
+    return render_template('main/ai_planner.html', title='AI Holiday Planner', form=form)
+
+@main_bp.route('/hotel_search', methods=['GET', 'POST'])
+def hotel_search():
+    # Clear any previous hotel search results from session
+    if 'hotel_search_results' in session:
+        session.pop('hotel_search_results')
+    
+    form = HotelSearchForm()
+    error_message = None
+    
+    if form.validate_on_submit():
+        try:
+            # Get form data and ensure we have valid values
+            city = form.city.data
+            if city is not None:
+                city = city.upper()
+            else:
+                flash('Please enter a valid city', 'danger')
+                return render_template('main/hotel_search.html', form=form)
+                
+            adults = form.adults.data or 1  # Default to 1 if None
+            rooms = form.rooms.data or 1    # Default to 1 if None
+            
+            # Get date ranges
+            check_in_date = form.check_in_date.data
+            check_out_date = form.check_out_date.data
+            
+            if not check_in_date or not check_out_date:
+                flash('Please enter valid dates', 'danger')
+                return render_template('main/hotel_search.html', form=form)
+            
+            print(f"Searching for hotels in {city} for {adults} adults in {rooms} rooms")
+            print(f"Check-in: {check_in_date}, Check-out: {check_out_date}")
+            
+            # Initialize API client
+            api_client = get_api_client()
+            
+            # Search for hotels - show loading state to user with flash message
+            flash('Searching for hotels. This may take a moment...', 'info')
+        
+            # Search for hotels
+            hotel_results = api_client.search_hotels(
+                city_code=city,
+                check_in_date=check_in_date,
+                check_out_date=check_out_date,
+                adults=adults,
+                rooms=rooms
+            )
+        
+            print(f"Hotel search status: {hotel_results.get('status')}")
+            
+            if hotel_results.get('status') == 'success':
+                hotels = hotel_results.get('hotels', [])
+                print(f"Found {len(hotels)} hotels")
+                
+                # Store results in session for later use (e.g., when booking a hotel)
+                session['hotel_search_results'] = hotel_results
+                
+                # Store search parameters for display
+                session['hotel_search_params'] = {
+                    'city': city,
+                    'check_in_date': check_in_date.strftime('%Y-%m-%d'),
+                    'check_out_date': check_out_date.strftime('%Y-%m-%d'),
+                    'adults': adults,
+                    'rooms': rooms
+                }
+                
+                # Flash a message if no hotels found
+                if not hotels:
+                    flash('No hotels found for your search criteria. Try different dates or location.', 'warning')
+                else:
+                    flash(f'Found {len(hotels)} hotels matching your criteria.', 'success')
+                
+                return render_template(
+                    'main/hotel_search.html',
+                    form=form,
+                    hotels=hotels,
+                    search_params=session['hotel_search_params']
+                )
+            else:
+                # Handle API error
+                error_message = hotel_results.get('message', 'Unknown error occurred')
+                print(f"Hotel search error: {error_message}")
+                flash(f'Error searching for hotels: {error_message}', 'danger')
+        
+        except Exception as e:
+            # Handle any unexpected errors
+            import traceback
+            traceback.print_exc()
+            print(f"Unexpected error in hotel search: {str(e)}")
+            flash(f'An unexpected error occurred: {str(e)}', 'danger')
+    
+    # GET request or form validation failed
+    return render_template('main/hotel_search.html', form=form, error_message=error_message)
+
+@main_bp.route('/activity_search', methods=['GET', 'POST'])
+def activity_search():
+    # Clear any previous activity search results from session
+    if 'activity_search_results' in session:
+        session.pop('activity_search_results')
+    
+    form = ActivitySearchForm()
+    error_message = None
+    
+    if form.validate_on_submit():
+        try:
+            # Get form data
+            location = form.location.data
+            date = form.date.data
+            category = form.category.data if form.category.data else None
+            
+            print(f"Searching for activities in {location} on {date}")
+            
+            # Initialize API client
+            api_client = get_api_client()
+            
+            # Search for activities
+            activity_results = api_client.search_activities(
+                location=location,
+                date=date,
+                category=category
+            )
+            
+            print(f"Activity search status: {activity_results.get('status')}")
+            
+            if activity_results.get('status') == 'success':
+                activities = activity_results.get('activities', [])
+                print(f"Found {len(activities)} activities")
+                
+                # Store results in session for later use
+                session['activity_search_results'] = activity_results
+                
+                # Store search parameters for display
+                session['activity_search_params'] = {
+                    'location': location,
+                    'date': date.strftime('%Y-%m-%d') if date else None,
+                    'category': category
+                }
+                
+                # Flash a message if no activities found
+                if not activities:
+                    flash('No activities found for your search criteria. Try a different location or date.', 'warning')
+                else:
+                    flash(f'Found {len(activities)} activities matching your criteria.', 'success')
+                
+                return render_template(
+                    'main/activity_search.html',
+                    form=form,
+                    activities=activities,
+                    search_params=session['activity_search_params']
+                )
+            else:
+                # Handle API error
+                error_message = activity_results.get('message', 'Unknown error occurred')
+                print(f"Activity search error: {error_message}")
+                flash(f'Error searching for activities: {error_message}', 'danger')
+        
+        except Exception as e:
+            # Handle any unexpected errors
+            import traceback
+            traceback.print_exc()
+            print(f"Unexpected error in activity search: {str(e)}")
+            flash(f'An unexpected error occurred: {str(e)}', 'danger')
+    
+    # GET request or form validation failed
+    return render_template('main/activity_search.html', form=form, error_message=error_message)
+
+@main_bp.route('/save-activity/<activity_id>', methods=['GET', 'POST'])
+@login_required
+def save_activity_to_itinerary(activity_id):
+    # Retrieve activity search results from session
+    activities = session.get('activity_search_results')
+    if not activities or activities.get('status') != 'success':
+        flash('Activity information not found. Please search for activities again.', 'warning')
+        return redirect(url_for('main.activity_search'))
+    
+    # Find the selected activity
+    selected_activity = None
+    for activity in activities.get('activities', []):
+        if activity.get('id') == activity_id:
+            selected_activity = activity
+            break
+    
+    if not selected_activity:
+        flash('The selected activity is no longer available. Please search for activities again.', 'warning')
+        return redirect(url_for('main.activity_search'))
+    
+    # Get user's itineraries for selection
+    user_itineraries = Itinerary.query.filter_by(user_id=current_user.id).all()
+    
+    if request.method == 'POST':
+        # Get selected itinerary
+        itinerary_id = request.form.get('itinerary_id')
+        
+        # Handle new itinerary creation
+        if itinerary_id == 'new':
+            new_itinerary_name = request.form.get('new_itinerary_name')
+            if not new_itinerary_name:
+                flash('Please provide a name for the new itinerary.', 'warning')
+                return render_template('main/save_activity_to_itinerary.html', 
+                                     activity=selected_activity,
+                                     itineraries=user_itineraries)
+            
+            # Get activity date from form
+            activity_date_str = request.form.get('activity_date')
+            activity_date = datetime.strptime(activity_date_str, '%Y-%m-%d')
+            
+            # Create a new itinerary
+            itinerary = Itinerary(
+                name=new_itinerary_name,
+                user_id=current_user.id,
+                start_date=activity_date,
+                end_date=activity_date + timedelta(days=7)  # Default 7-day duration
+            )
+            db.session.add(itinerary)
+            db.session.commit()
+            itinerary_id = itinerary.id
+        else:
+            # Check if itinerary exists and belongs to user
+            itinerary = Itinerary.query.get(itinerary_id)
+            if not itinerary or itinerary.user_id != current_user.id:
+                flash('Invalid itinerary selection.', 'danger')
+                return render_template('main/save_activity_to_itinerary.html', 
+                                    activity=selected_activity,
+                                    itineraries=user_itineraries)
+        
+        # Get activity date and time from form
+        activity_date_str = request.form.get('activity_date')
+        activity_date = datetime.strptime(activity_date_str, '%Y-%m-%d')
+        
+        activity_time_str = request.form.get('activity_time', '10:00')
+        hour, minute = map(int, activity_time_str.split(':'))
+        
+        # Create start time by combining date and time
+        start_time = activity_date.replace(hour=hour, minute=minute)
+        
+        # Calculate end time based on duration
+        duration_minutes = int(selected_activity.get('duration', 60))
+        end_time = start_time + timedelta(minutes=duration_minutes)
+        
+        # Create new activity record in the database with required fields
+        activity = Activity(
+            itinerary_id=itinerary_id,
+            name=selected_activity['name'],
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        # Add optional fields if they exist in the model
+        if hasattr(Activity, 'description') and 'description' in selected_activity:
+            activity.description = selected_activity['description']
+            
+        if hasattr(Activity, 'location') and 'location' in selected_activity:
+            activity.location = selected_activity['location']
+        
+        if hasattr(Activity, 'duration') and 'duration' in selected_activity:
+            activity.duration = int(selected_activity['duration'])
+        
+        # Handle cost - convert from price object if necessary
+        if hasattr(Activity, 'cost'):
+            if 'price' in selected_activity and 'amount' in selected_activity['price']:
+                activity.cost = float(selected_activity['price']['amount'])
+            elif 'cost' in selected_activity:
+                activity.cost = float(selected_activity['cost'])
+            else:
+                activity.cost = 0.0  # Default to free if no cost info
+        
+        db.session.add(activity)
+        db.session.commit()
+        
+        flash(f'Activity saved to your "{itinerary.name}" itinerary successfully!', 'success')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    # GET request - show form to select itinerary
+    return render_template('main/save_activity_to_itinerary.html', 
+                         activity=selected_activity,
+                         itineraries=user_itineraries,
+                         activity_date=session.get('activity_search_params', {}).get('date'))
+
+@main_bp.route('/book-flight/<flight_id>', methods=['GET', 'POST'])
+@login_required
+def book_flight(flight_id):
+    # Retrieve flight search results from session
+    flights = session.get('flight_search_results')
+    if not flights or flights.get('status') != 'success':
+        flash('Flight information not found. Please search for flights again.', 'warning')
+        return redirect(url_for('main.search_flights'))
+    
+    # Find the selected flight
+    selected_flight = None
+    for flight in flights.get('flights', []):
+        if flight.get('id') == flight_id:
+            selected_flight = flight
+            break
+    
+    if not selected_flight:
+        flash('The selected flight is no longer available. Please search for flights again.', 'warning')
+        return redirect(url_for('main.search_flights'))
+    
+    # Get user's itineraries for selection
+    user_itineraries = Itinerary.query.filter_by(user_id=current_user.id).all()
+    
+    if request.method == 'POST':
+        # Get selected itinerary
+        itinerary_id = request.form.get('itinerary_id')
+        
+        # Handle new itinerary creation
+        if itinerary_id == 'new':
+            new_itinerary_name = request.form.get('new_itinerary_name')
+            if not new_itinerary_name:
+                flash('Please provide a name for the new itinerary.', 'warning')
+                return render_template('main/save_flight_to_itinerary.html', 
+                                     flight=selected_flight,
+                                     itineraries=user_itineraries)
+            
+            # Create a new itinerary
+            itinerary = Itinerary(
+                name=new_itinerary_name,
+                user_id=current_user.id,
+                start_date=datetime.now(),
+                end_date=datetime.now() + timedelta(days=7)  # Default 7-day duration
+            )
+            db.session.add(itinerary)
+            db.session.commit()
+            itinerary_id = itinerary.id
+        
+        # Check if itinerary exists and belongs to user
+        itinerary = Itinerary.query.get(itinerary_id)
+        if not itinerary or itinerary.user_id != current_user.id:
+            flash('Invalid itinerary selection.', 'danger')
+            return render_template('main/save_flight_to_itinerary.html', 
+                                 flight=selected_flight,
+                                 itineraries=user_itineraries)
+        
+        # Generate a unique booking reference for all segments
+        booking_reference = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+        
+        # Calculate cost per segment
+        total_cost = float(selected_flight['price']['total'])
+        segments_count = len(selected_flight['segments'])
+        cost_per_segment = total_cost / segments_count
+        
+        # Save each flight segment
+        for i, segment in enumerate(selected_flight['segments']):
+            flight = Flight(
+                itinerary_id=itinerary_id,
+                departure_airport=segment['departure']['iataCode'],
+                arrival_airport=segment['arrival']['iataCode'],
+                departure_time=datetime.strptime(
+                    segment['departure']['at'].replace('Z', ''), 
+                    '%Y-%m-%dT%H:%M:%S'
+                ),
+                arrival_time=datetime.strptime(
+                    segment['arrival']['at'].replace('Z', ''), 
+                    '%Y-%m-%dT%H:%M:%S'
+                ),
+                airline=segment['carrierCode'],
+                flight_number=segment['number'],
+                cost=cost_per_segment,
+                booking_reference=booking_reference,
+                is_connection=segments_count > 1,
+                connection_group=booking_reference,
+                segment_order=i,
+                duration=segment['duration']
+            )
+            db.session.add(flight)
+        
+        db.session.commit()
+        
+        # Generate booking URL
+        first_segment = selected_flight['segments'][0]
+        
+        # For a more reliable booking URL, identify if this is a round trip
+        is_round_trip = False
+        
+        if len(selected_flight['segments']) > 1:
+            # Check if the first and last airports match (typical round trip pattern)
+            first_departure = first_segment['departure']['iataCode']
+            last_segment = selected_flight['segments'][-1]
+            last_arrival = last_segment['arrival']['iataCode']
+            
+            if first_departure == last_arrival:
+                is_round_trip = True
+        
+        # Get the origin airport (always the first departure airport)
+        origin_airport = first_segment['departure']['iataCode']
+        
+        # Get the destination airport (always the final arrival airport, regardless of connections)
+        last_segment = selected_flight['segments'][-1]
+        
+        # For round trip flights, the last segment is the return flight, so we need the outbound destination
+        if is_round_trip:
+            # Find the turning point in the journey (where outbound ends and return starts)
+            # This is typically the middle segment's arrival for an odd number of segments
+            middle_index = len(selected_flight['segments']) // 2
+            if len(selected_flight['segments']) % 2 == 1:  # Odd number of segments
+                destination_airport = selected_flight['segments'][middle_index]['arrival']['iataCode']
+            else:  # Even number of segments
+                # For even number of segments, the turning point is between two segments
+                destination_airport = selected_flight['segments'][middle_index - 1]['arrival']['iataCode']
+        else:
+            # For one-way trips or multi-city, use the final destination
+            destination_airport = last_segment['arrival']['iataCode']
+        
+        # Print debug information
+        print(f"DEBUG - Number of segments: {len(selected_flight['segments'])}")
+        print(f"DEBUG - First segment: {first_segment}")
+        print(f"DEBUG - Last segment: {last_segment}")
+        print(f"DEBUG - Is round trip: {is_round_trip}")
+        print(f"DEBUG - Origin airport: {origin_airport}")
+        print(f"DEBUG - Destination airport: {destination_airport}")
+        
+        # Format the date correctly for Skyscanner (YYYY-MM-DD format)
+        departure_date = first_segment['departure']['at'].split('T')[0]
+        
+        # Construct appropriate URL based on trip type
+        if is_round_trip:
+            # For round trips, include the return date
+            return_date = last_segment['departure']['at'].split('T')[0]
+            booking_url = f"https://www.skyscanner.com/transport/flights/{origin_airport}/{destination_airport}/{departure_date.replace('-', '')}/{return_date.replace('-', '')}/?adults=1&cabinclass=economy&outboundaltsenabled=false&preferDirects=false"
+        else:
+            # For one-way trips
+            booking_url = f"https://www.skyscanner.com/transport/flights/{origin_airport}/{destination_airport}/{departure_date.replace('-', '')}/?adults=1&cabinclass=economy&outboundaltsenabled=false&preferDirects=false&rtn=0"
+        
+        flash(f'Flight saved to your "{itinerary.name}" itinerary successfully!', 'success')
+        return render_template('main/flight_saved.html', 
+                              flight=selected_flight,
+                              booking_url=booking_url,
+                              itinerary=itinerary)
+    
+    # GET request - show form to select itinerary
+    return render_template('main/save_flight_to_itinerary.html', 
+                          flight=selected_flight,
+                          itineraries=user_itineraries)
+
+@main_bp.route('/book-hotel/<hotel_id>/<offer_id>', methods=['GET', 'POST'])
+@login_required
+def book_hotel(hotel_id, offer_id):
+    # Retrieve hotel search results from session
+    hotels = session.get('hotel_search_results')
+    if not hotels or hotels.get('status') != 'success':
+        flash('Hotel information not found. Please search for hotels again.', 'warning')
+        return redirect(url_for('main.hotel_search'))
+    
+    # Find the selected hotel and offer
+    selected_hotel = None
+    selected_offer = None
+    
+    for hotel in hotels.get('hotels', []):
+        if hotel.get('hotel_id') == hotel_id:
+            selected_hotel = hotel
+            for offer in hotel.get('offers', []):
+                if offer.get('id') == offer_id:
+                    selected_offer = offer
+                    break
+            break
+    
+    if not selected_hotel or not selected_offer:
+        flash('The selected hotel or offer is no longer available. Please search for hotels again.', 'warning')
+        return redirect(url_for('main.hotel_search'))
+    
+    # Add all offers to the hotel object for template rendering
+    selected_hotel['offers'] = selected_hotel.get('offers', [])
+    
+    # Get user's itineraries for selection
+    user_itineraries = Itinerary.query.filter_by(user_id=current_user.id).all()
+    
+    if request.method == 'POST':
+        # Get selected itinerary and room type
+        itinerary_id = request.form.get('itinerary_id')
+        selected_room_offer_id = request.form.get('room_type')
+        
+        # Find the selected room offer
+        selected_room_offer = None
+        for offer in selected_hotel['offers']:
+            if offer['id'] == selected_room_offer_id:
+                selected_room_offer = offer
+                break
+        
+        if not selected_room_offer:
+            flash('Please select a valid room type.', 'warning')
+            return render_template('main/save_hotel_to_itinerary.html', 
+                                hotel=selected_hotel,
+                                itineraries=user_itineraries)
+        
+        # Handle new itinerary creation
+        if itinerary_id == 'new':
+            new_itinerary_name = request.form.get('new_itinerary_name')
+            if not new_itinerary_name:
+                flash('Please provide a name for the new itinerary.', 'warning')
+                return render_template('main/save_hotel_to_itinerary.html', 
+                                     hotel=selected_hotel,
+                                     itineraries=user_itineraries)
+            
+            # Create a new itinerary
+            itinerary = Itinerary(
+                name=new_itinerary_name,
+                user_id=current_user.id,
+                start_date=datetime.strptime(selected_room_offer['check_in'], '%Y-%m-%d'),
+                end_date=datetime.strptime(selected_room_offer['check_out'], '%Y-%m-%d')
+            )
+            db.session.add(itinerary)
+            db.session.commit()
+            itinerary_id = itinerary.id
+        
+        # Check if itinerary exists and belongs to user
+        itinerary = Itinerary.query.get(itinerary_id)
+        if not itinerary or itinerary.user_id != current_user.id:
+            flash('Invalid itinerary selection.', 'danger')
+            return render_template('main/save_hotel_to_itinerary.html', 
+                                 hotel=selected_hotel,
+                                 itineraries=user_itineraries)
+        
+        # Create new accommodation record in the database
+        accommodation = Accommodation(
+            itinerary_id=itinerary_id,
+            name=selected_hotel['name'],
+            address=f"{selected_hotel['address']['city']}, {selected_hotel['address']['country']}",
+            check_in_date=datetime.strptime(selected_room_offer['check_in'], '%Y-%m-%d'),
+            check_out_date=datetime.strptime(selected_room_offer['check_out'], '%Y-%m-%d'),
+            cost_per_night=float(selected_room_offer['price']['total']) / ((datetime.strptime(selected_room_offer['check_out'], '%Y-%m-%d') - datetime.strptime(selected_room_offer['check_in'], '%Y-%m-%d')).days),
+            type=selected_room_offer['room_type']
+        )
+        
+        db.session.add(accommodation)
+        db.session.commit()
+        
+        # Generate booking URL
+        booking_url = f"https://www.booking.com/searchresults.html?ss={selected_hotel['address']['city']}&ssne={selected_hotel['address']['city']}&checkin={selected_room_offer['check_in']}&checkout={selected_room_offer['check_out']}&group_adults={selected_room_offer['guests']['adults']}&no_rooms=1"
+        
+        flash(f'Hotel saved to your "{itinerary.name}" itinerary successfully!', 'success')
+        return render_template('main/hotel_saved.html', 
+                             accommodation=accommodation,
+                             booking_url=booking_url,
+                             hotel=selected_hotel,
+                             itinerary=itinerary)
+    
+    # GET request - show form to select itinerary
+    # Set the initially selected offer for display in the template
+    selected_hotel['initially_selected_offer'] = selected_offer
+    
+    return render_template('main/save_hotel_to_itinerary.html', 
+                         hotel=selected_hotel,
+                         itineraries=user_itineraries)
+
+@main_bp.route('/booking-confirmation/<booking_type>/<booking_reference>')
+@login_required
+def booking_confirmation(booking_type, booking_reference):
+    booking = None
+    booking_details = None
+    email = None
+    
+    if booking_type == 'flight':
+        booking = FlightBooking.query.filter_by(
+            reference_number=booking_reference,
+            user_id=current_user.id
+        ).first_or_404()
+        
+        booking_details = json.loads(booking.booking_details)
+        email = booking.email
+        
+    elif booking_type == 'hotel':
+        booking = HotelBooking.query.filter_by(
+            reference_number=booking_reference,
+            user_id=current_user.id
+        ).first_or_404()
+        
+        booking_details = json.loads(booking.booking_details)
+        email = booking.email
+    
+    if not booking:
+        flash('Booking not found.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    return render_template('main/booking_confirmation.html',
+                          booking_type=booking_type,
+                          booking_reference=booking_reference,
+                          booking_details=booking_details,
+                          email=email)
+
+@main_bp.route('/test-itinerary')
+@login_required
+def test_itinerary():
+    """
+    Creates a test itinerary with sample flights and activities for testing the itinerary details view
+    """
+    # Check if test itinerary already exists
+    test_itinerary = Itinerary.query.filter_by(user_id=current_user.id, name="Test Itinerary").first()
+    
+    if not test_itinerary:
+        # Create a new test itinerary
+        test_itinerary = Itinerary(
+            name="Test Itinerary",
+            user_id=current_user.id,
+            start_date=datetime.now(),
+            end_date=datetime.now() + timedelta(days=7),
+            total_budget=1500.00
+        )
+        db.session.add(test_itinerary)
+        db.session.commit()
+        
+        # Add destination
+        destination = Destination(
+            itinerary_id=test_itinerary.id,
+            name="New York City",
+            country="United States",
+            description="The city that never sleeps",
+            arrival_date=datetime.now() + timedelta(days=1),
+            departure_date=datetime.now() + timedelta(days=6)
+        )
+        db.session.add(destination)
+        
+        # Add sample flights
+        flight1 = Flight(
+            itinerary_id=test_itinerary.id,
+            departure_airport="LHR",
+            arrival_airport="JFK",
+            departure_time=datetime.now() + timedelta(days=1),
+            arrival_time=datetime.now() + timedelta(days=1, hours=8),
+            airline="British Airways",
+            flight_number="BA177",
+            cost=450.00,
+            booking_reference="BA12345",
+            stops=0,
+            duration="8h 20m"
+        )
+        
+        flight2 = Flight(
+            itinerary_id=test_itinerary.id,
+            departure_airport="JFK",
+            arrival_airport="LHR",
+            departure_time=datetime.now() + timedelta(days=6),
+            arrival_time=datetime.now() + timedelta(days=6, hours=7),
+            airline="Virgin Atlantic",
+            flight_number="VS26",
+            cost=480.00,
+            booking_reference="VS67890",
+            stops=0,
+            duration="7h 05m"
+        )
+        
+        db.session.add(flight1)
+        db.session.add(flight2)
+        
+        # Add mock activities
+        add_mock_activities(test_itinerary.id)
+        
+        flash("Test itinerary created with sample flights and activities!")
+    else:
+        # If it exists but has no activities, add mock activities
+        activities = Activity.query.filter_by(itinerary_id=test_itinerary.id).all()
+        if not activities:
+            add_mock_activities(test_itinerary.id)
+            flash("Added mock activities to your existing test itinerary!")
+        else:
+            flash("Test itinerary already exists!")
+    
+    return redirect(url_for('main.itinerary_detail', itinerary_id=test_itinerary.id))
+
+def add_mock_activities(itinerary_id):
+    """Helper function to add mock activities to an itinerary"""
+    # Get the itinerary to access its dates
+    itinerary = Itinerary.query.get(itinerary_id)
+    
+    if not itinerary:
+        print("Error: Itinerary not found")
+        return
+    
+    # Create a list of activity types and descriptions
+    mock_activities = [
+        {
+            "name": "Statue of Liberty Tour",
+            "description": "Visit the iconic Statue of Liberty and Ellis Island.",
+            "duration": 180,  # minutes
+            "location": "Liberty Island",
+            "cost": 25.50,
+            "day_offset": 2,
+            "start_hour": 10
+        },
+        {
+            "name": "Central Park Bike Ride",
+            "description": "Explore the beautiful Central Park on a bike.",
+            "duration": 120,  # minutes
+            "location": "Central Park",
+            "cost": 15.00,
+            "day_offset": 2,
+            "start_hour": 14
+        },
+        {
+            "name": "Broadway Show",
+            "description": "Enjoy a fantastic Broadway performance.",
+            "duration": 150,  # minutes
+            "location": "Theatre District",
+            "cost": 120.00,
+            "day_offset": 2,
+            "start_hour": 19
+        },
+        {
+            "name": "Museum of Modern Art",
+            "description": "Explore famous works of modern art at MoMA.",
+            "duration": 180,  # minutes
+            "location": "11 W 53rd St",
+            "cost": 25.00,
+            "day_offset": 3,
+            "start_hour": 11
+        },
+        {
+            "name": "Empire State Building",
+            "description": "Take in stunning views from the Empire State Building observation deck.",
+            "duration": 120,  # minutes
+            "location": "20 W 34th St",
+            "cost": 42.00,
+            "day_offset": 3,
+            "start_hour": 16
+        },
+        {
+            "name": "Times Square Evening",
+            "description": "Experience the bright lights and energy of Times Square.",
+            "duration": 120,  # minutes
+            "location": "Times Square",
+            "cost": 0.00,
+            "day_offset": 3,
+            "start_hour": 20
+        },
+        {
+            "name": "Brooklyn Bridge Walk",
+            "description": "Walk across the famous Brooklyn Bridge for great city views.",
+            "duration": 90,  # minutes
+            "location": "Brooklyn Bridge",
+            "cost": 0.00,
+            "day_offset": 4,
+            "start_hour": 9
+        },
+        {
+            "name": "Chinatown Food Tour",
+            "description": "Sample delicious food in Manhattan's Chinatown neighborhood.",
+            "duration": 150,  # minutes
+            "location": "Chinatown",
+            "cost": 35.00,
+            "day_offset": 4,
+            "start_hour": 13
+        },
+        {
+            "name": "Nighttime Harbor Cruise",
+            "description": "See the city skyline lit up from the water.",
+            "duration": 120,  # minutes
+            "location": "Pier 83",
+            "cost": 45.00,
+            "day_offset": 4,
+            "start_hour": 20
+        }
+    ]
+    
+    # Create activities spread throughout the itinerary dates
+    start_date = itinerary.start_date
+    for activity_data in mock_activities:
+        # Calculate the date based on the day offset
+        activity_date = start_date + timedelta(days=activity_data['day_offset'])
+        
+        # Create start and end times
+        start_time = activity_date.replace(hour=activity_data['start_hour'], minute=0)
+        end_time = start_time + timedelta(minutes=activity_data['duration'])
+        
+        # Create the activity with all available fields
+        try:
+            activity = Activity(
+                itinerary_id=itinerary_id,
+                name=activity_data['name'],
+                description=activity_data['description'],
+                location=activity_data['location'],
+                cost=activity_data['cost'],
+                duration=activity_data['duration'],
+                start_time=start_time,
+                end_time=end_time
+            )
+            
+            db.session.add(activity)
+        except Exception as e:
+            print(f"Error creating activity: {e}")
+    
+    try:
+        db.session.commit()
+        print(f"Added {len(mock_activities)} mock activities to itinerary {itinerary_id}")
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error committing activities: {e}")
+        print(traceback.format_exc())
+
+@main_bp.route('/itinerary/<int:itinerary_id>')
+@login_required
+def itinerary_detail(itinerary_id):
+    """
+    Display the details of a specific itinerary
+    """
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    
+    # Ensure the user owns this itinerary
+    if itinerary.user_id != current_user.id:
+        flash("You do not have permission to view this itinerary.")
+        return redirect(url_for('main.dashboard'))
+    
+    # Get all related data
+    flights = Flight.query.filter_by(itinerary_id=itinerary_id).order_by(Flight.departure_time).all()
+    accommodations = Accommodation.query.filter_by(itinerary_id=itinerary_id).all()
+    activities = Activity.query.filter_by(itinerary_id=itinerary_id).order_by(Activity.start_time).all()
+    destinations = Destination.query.filter_by(itinerary_id=itinerary_id).all()
+    
+    # Calculate costs for budget
+    flight_costs = sum(flight.cost or 0 for flight in flights)
+    
+    # For accommodations, calculate the total cost based on cost per night and duration
+    accommodation_costs = 0
+    for acc in accommodations:
+        nights = (acc.check_out_date - acc.check_in_date).days
+        accommodation_costs += (acc.cost_per_night or 0) * nights
+    
+    # Sum activity costs
+    activity_costs = sum(getattr(activity, 'cost', 0) or 0 for activity in activities)
+    
+    # Calculate total spent and remaining budget
+    total_spent = flight_costs + accommodation_costs + activity_costs
+    remaining_budget = (itinerary.total_budget or 0) - total_spent
+    
+    response = make_response(render_template('main/itinerary_detail.html',
+                         title=f'Itinerary: {itinerary.name}',
+                         itinerary=itinerary,
+                         flights=flights,
+                         accommodations=accommodations,
+                         activities=activities,
+                         destinations=destinations,
+                         flight_costs=flight_costs,
+                         accommodation_costs=accommodation_costs,
+                         activity_costs=activity_costs,
+                         total_spent=total_spent,
+                         remaining_budget=remaining_budget))
+    
+    # Add cache control headers
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
+
+@main_bp.route('/itinerary/<int:itinerary_id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_itinerary(itinerary_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    
+    # Check if the user owns this itinerary
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to edit this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    form = ItineraryForm(obj=itinerary)
+    
+    if form.validate_on_submit():
+        form.populate_obj(itinerary)
+        db.session.commit()
+        flash('Itinerary updated successfully!', 'success')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary.id))
+    
+    return render_template('main/edit_itinerary.html', form=form, itinerary=itinerary)
+
+@main_bp.route('/itinerary/<int:itinerary_id>/remove-flight/<int:flight_id>', methods=['POST'])
+@login_required
+def remove_flight(itinerary_id, flight_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to modify this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    flight = Flight.query.get_or_404(flight_id)
+    if flight.itinerary_id != itinerary_id:
+        flash('Invalid flight for this itinerary.', 'danger')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    db.session.delete(flight)
+    db.session.commit()
+    flash('Flight removed successfully.', 'success')
+    return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+
+@main_bp.route('/itinerary/<int:itinerary_id>/remove-accommodation/<int:accommodation_id>', methods=['POST'])
+@login_required
+def remove_accommodation(itinerary_id, accommodation_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to modify this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    accommodation = Accommodation.query.get_or_404(accommodation_id)
+    if accommodation.itinerary_id != itinerary_id:
+        flash('Invalid accommodation for this itinerary.', 'danger')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    db.session.delete(accommodation)
+    db.session.commit()
+    flash('Accommodation removed successfully.', 'success')
+    return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+
+@main_bp.route('/itinerary/<int:itinerary_id>/remove-activity/<int:activity_id>', methods=['POST'])
+@login_required
+def remove_activity(itinerary_id, activity_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to modify this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    activity = Activity.query.get_or_404(activity_id)
+    if activity.itinerary_id != itinerary_id:
+        flash('Invalid activity for this itinerary.', 'danger')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    db.session.delete(activity)
+    db.session.commit()
+    flash('Activity removed successfully.', 'success')
+    return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+
+@main_bp.route('/itinerary/<int:itinerary_id>/remove-destination/<int:destination_id>', methods=['POST'])
+@login_required
+def remove_destination(itinerary_id, destination_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to modify this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    destination = Destination.query.get_or_404(destination_id)
+    if destination.itinerary_id != itinerary_id:
+        flash('Invalid destination for this itinerary.', 'danger')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    db.session.delete(destination)
+    db.session.commit()
+    flash('Destination removed successfully.', 'success')
+    return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+
+@main_bp.route('/itinerary/<int:itinerary_id>/add-accommodation', methods=['GET', 'POST'])
+@login_required
+def add_accommodation(itinerary_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to modify this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    form = AccommodationForm()
+    if form.validate_on_submit():
+        accommodation = Accommodation(
+            itinerary_id=itinerary_id,
+            name=form.name.data,
+            address=form.address.data,
+            check_in_date=form.check_in_date.data,
+            check_out_date=form.check_out_date.data,
+            cost_per_night=form.cost_per_night.data,
+            type=form.type.data
+        )
+        db.session.add(accommodation)
+        db.session.commit()
+        flash('Accommodation added successfully!', 'success')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    return render_template('main/add_accommodation.html', form=form, itinerary=itinerary)
+
+@main_bp.route('/itinerary/<int:itinerary_id>/add-activity', methods=['GET', 'POST'])
+@login_required
+def add_activity(itinerary_id):
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    if itinerary.user_id != current_user.id:
+        flash('You do not have permission to modify this itinerary.', 'danger')
+        return redirect(url_for('main.dashboard'))
+    
+    form = ActivityForm()
+    if form.validate_on_submit():
+        # Parse the form date to create start_time and end_time
+        activity_date = form.date.data
+        
+        # Default start and end times if not provided
+        start_hour, start_minute = 9, 0  # Default to 9:00 AM
+        duration_minutes = 60  # Default duration of 1 hour
+        
+        # Try to parse duration as minutes
+        if form.duration.data:
+            try:
+                duration_minutes = int(form.duration.data)
+            except (ValueError, TypeError):
+                duration_minutes = 60
+        
+        # Create start_time by combining date with default time
+        # Ensure date is not None before using it
+        if activity_date:
+            start_time = datetime.combine(activity_date, datetime.min.time().replace(hour=start_hour, minute=start_minute))
+            # Calculate end_time based on duration
+            end_time = start_time + timedelta(minutes=duration_minutes)
+        else:
+            # If no date provided, use current date
+            start_time = datetime.now().replace(hour=start_hour, minute=start_minute)
+            end_time = start_time + timedelta(minutes=duration_minutes)
+        
+        activity = Activity(
+            itinerary_id=itinerary_id,
+            name=form.name.data,
+            description=form.description.data,
+            location=form.location.data,
+            cost=form.cost.data if form.cost.data is not None else 0.0,
+            duration=duration_minutes,
+            start_time=start_time,
+            end_time=end_time
+        )
+        
+        db.session.add(activity)
+        db.session.commit()
+        flash('Activity added successfully!', 'success')
+        return redirect(url_for('main.itinerary_detail', itinerary_id=itinerary_id))
+    
+    return render_template('main/add_activity.html', form=form, itinerary=itinerary)
+
+@main_bp.route('/itinerary/<int:itinerary_id>/update-flight-cost/<int:flight_id>', methods=['POST'])
+@login_required
+def update_flight_cost(itinerary_id, flight_id):
+    """
+    Update the cost of a flight in an itinerary
+    """
+    itinerary = Itinerary.query.get_or_404(itinerary_id)
+    
+    # Ensure the user owns this itinerary
+    if itinerary.user_id != current_user.id:
+        return jsonify({'success': False, 'error': 'Permission denied'}), 403
+    
+    flight = Flight.query.get_or_404(flight_id)
+    
+    # Ensure the flight belongs to the specified itinerary
+    if flight.itinerary_id != itinerary_id:
+        return jsonify({'success': False, 'error': 'Flight does not belong to this itinerary'}), 400
+    
+    try:
+        # Get the new cost from the request
+        cost = float(request.form.get('cost', 0))
+        
+        # Update the flight's cost
+        flight.cost = cost
+        db.session.commit()
+        
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error updating flight cost: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/search-flight-price', methods=['GET', 'POST'])
+@login_required
+def search_flight_price():
+    """
+    Advanced flight price search using binary search algorithm.
+    This demonstrates a more complex algorithmic approach for the OCR H446 NEA.
+    """
+    form = FlightSearchForm()
+    comparison_results = None
+    error = None
+    
+    if request.method == 'POST':
+        try:
+            # Get search parameters
+            target_price = float(request.form.get('target_price', 0))
+            price_tolerance = float(request.form.get('price_tolerance', 50))
+            origin = request.form.get('origin', '').upper() if request.form.get('origin') else None
+            destination = request.form.get('destination', '').upper() if request.form.get('destination') else None
+            
+            # Validate parameters
+            if target_price <= 0:
+                error = "Please enter a valid target price."
+            else:
+                # Run the comparison between binary and linear search
+                comparison_results = compare_search_algorithms(
+                    target_price=target_price,
+                    tolerance=price_tolerance,
+                    origin=origin,
+                    destination=destination
+                )
+                
+                # Format results for display
+                for algorithm in ['binary_search', 'linear_search']:
+                    # Format flight information for display
+                    comparison_results[algorithm]['formatted_results'] = []
+                    
+                    for flight in comparison_results[algorithm]['results']:
+                        formatted_flight = {
+                            'id': flight.id,
+                            'departure_airport': flight.departure_airport,
+                            'arrival_airport': flight.arrival_airport,
+                            'airline': flight.airline,
+                            'departure_time': flight.departure_time.strftime('%Y-%m-%d %H:%M'),
+                            'arrival_time': flight.arrival_time.strftime('%Y-%m-%d %H:%M'),
+                            'cost': flight.cost,
+                            'price_difference': abs(flight.cost - target_price)
+                        }
+                        comparison_results[algorithm]['formatted_results'].append(formatted_flight)
+        
+        except ValueError as e:
+            error = f"Invalid input: {str(e)}"
+        except Exception as e:
+            error = f"An error occurred: {str(e)}"
+            print(f"Error details: {traceback.format_exc()}")
+    
+    # For GET request or unsuccessful POST
+    return render_template(
+        'main/flight_price_search.html',
+        title='Advanced Flight Price Search',
+        form=form,
+        comparison_results=comparison_results,
+        error=error
+    )
+
+@main_bp.route('/ai-recommendations', methods=['GET', 'POST'])
+@login_required
+def ai_recommendations():
+    """
+    Route for AI-powered destination and itinerary recommendations
+    using neural networks
+    """
+    form = AiItineraryForm()
+    recommendations = None
+    interests = None
+    
+    if form.validate_on_submit():
+        try:
+            # Extract form data
+            destination = form.destination.data
+            start_date = form.start_date.data
+            duration_days = form.duration_days.data
+            budget = form.budget.data
+            interests = form.interests.data
+            age = form.age.data if form.age.data else 25
+            travel_style = form.travel_style.data
+            
+            # Convert interests to list
+            interest_list = [interest.strip().lower() for interest in interests.split(',')]
+            
+            # Create recommendation model
+            neural_recommender = NeuralRecommender()
+            
+            # Get recommendations
+            recommendations = neural_recommender.get_destination_recommendations({
+                'interests': interest_list,
+                'budget': budget,
+                'duration': duration_days,
+                'month': start_date.month,
+                'age': age
+            })
+            
+            # Store preferences in session for later use
+            session['ai_preferences'] = {
+                'destination': destination,
+                'start_date': start_date.isoformat(),
+                'duration_days': duration_days,
+                'budget': budget,
+                'interests': interests,
+                'age': age,
+                'travel_style': travel_style
+            }
+            
+            # If destination is specified, filter or create recommendation
+            if destination:
+                # Check if destination is in recommendations
+                destination_in_list = False
+                for rec in recommendations:
+                    if rec['name'].lower() == destination.lower():
+                        destination_in_list = True
+                        break
+                
+                # If not, add it with a decent match percentage
+                if not destination_in_list:
+                    recommendations.insert(0, {
+                        'name': destination,
+                        'score': 0.85,
+                        'match_percentage': 85
+                    })
+                
+                # Redirect to itinerary generation
+                return redirect(url_for('main.create_ai_itinerary', destination=destination))
+            
+        except Exception as e:
+            print(f"Error in AI recommendations: {str(e)}")
+            print(traceback.format_exc())
+            flash('An error occurred while generating recommendations.', 'error')
+    
+    return render_template('main/ai_itinerary.html', 
+                          title='AI Travel Recommendations',
+                          form=form, 
+                          recommendations=recommendations,
+                          interests=interests)
+
+@main_bp.route('/create-ai-itinerary/<destination>', methods=['GET'])
+@login_required
+def create_ai_itinerary(destination):
+    """
+    Create an AI-generated itinerary for a specific destination
+    """
+    try:
+        # Get preferences from session
+        preferences = session.get('ai_preferences')
+        if not preferences:
+            flash('Please enter your travel preferences first.', 'warning')
+            return redirect(url_for('main.ai_recommendations'))
+        
+        # Parse dates
+        start_date = datetime.fromisoformat(preferences['start_date'])
+        duration_days = int(preferences['duration_days'])
+        end_date = start_date + timedelta(days=duration_days)
+        budget = float(preferences['budget'])
+        interests = preferences['interests']
+        
+        # Create itinerary name
+        itinerary_name = f"AI Trip to {destination} ({duration_days} days)"
+        
+        # Create the itinerary
+        itinerary = Itinerary(
+            user_id=current_user.id,
+            name=itinerary_name,
+            start_date=start_date,
+            end_date=end_date,
+            total_budget=budget,
+            is_ai_generated=True,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(itinerary)
+        db.session.flush()  # Get the itinerary ID
+        
+        # Create destination
+        destination_obj = Destination(
+            itinerary_id=itinerary.id,
+            name=destination,
+            country=get_country_for_destination(destination),
+            description=f"AI recommended destination based on your interests in {interests}",
+            arrival_date=start_date,
+            departure_date=end_date,
+            created_at=datetime.utcnow()
+        )
+        db.session.add(destination_obj)
+        
+        # Import the AI planner
+        from app.utils.ai_planner import ItineraryGenerator
+        
+        # Create itinerary generator
+        planner = ItineraryGenerator()
+        
+        # Generate activities
+        interests_list = [interest.strip().lower() for interest in interests.split(',')]
+        activities_data = planner.generate_itinerary(
+            destination=destination,
+            duration_days=duration_days,
+            budget=budget,
+            interests_text=interests
+        )
+        
+        # Add activities to itinerary
+        current_date = start_date
+        for i, activity_data in enumerate(activities_data):
+            # Distribute activities evenly across the trip duration
+            day_offset = i % duration_days
+            activity_date = start_date + timedelta(days=day_offset)
+            
+            # Create morning/afternoon time slots
+            hour = 10 if i % 2 == 0 else 14
+            activity_datetime = datetime.combine(
+                activity_date.date(), 
+                datetime.min.time().replace(hour=hour)
+            )
+            
+            activity = Activity(
+                itinerary_id=itinerary.id,
+                name=activity_data['name'],
+                description=activity_data['description'],
+                date=activity_datetime,
+                duration=activity_data['duration'],
+                location=destination,
+                cost=activity_data['cost'],
+                created_at=datetime.utcnow()
+            )
+            db.session.add(activity)
+        
+        # Commit all changes
+        db.session.commit()
+        
+        # Add flash message
+        flash(f'AI itinerary for {destination} created successfully!', 'success')
+        
+        # Return to recommendations page with the generated itinerary
+        generated_itinerary = Itinerary.query.get(itinerary.id)
+        return render_template('main/ai_itinerary.html',
+                              title='AI Travel Recommendations',
+                              form=AiItineraryForm(),
+                              generated_itinerary=generated_itinerary,
+                              interests=interests)
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating AI itinerary: {str(e)}")
+        print(traceback.format_exc())
+        flash('An error occurred while creating your AI itinerary.', 'error')
+        return redirect(url_for('main.ai_recommendations'))
+
+def get_country_for_destination(destination):
+    """Helper function to get country for common destinations"""
+    destination_map = {
+        'London': 'United Kingdom',
+        'Paris': 'France',
+        'Rome': 'Italy',
+        'Barcelona': 'Spain',
+        'Amsterdam': 'Netherlands',
+        'Berlin': 'Germany',
+        'Prague': 'Czech Republic',
+        'Vienna': 'Austria',
+        'Venice': 'Italy',
+        'Madrid': 'Spain',
+        'New York': 'United States',
+        'Tokyo': 'Japan',
+        'Sydney': 'Australia',
+        'Dubai': 'United Arab Emirates',
+        'Bangkok': 'Thailand',
+        'Hong Kong': 'China',
+        'Singapore': 'Singapore',
+        'Istanbul': 'Turkey',
+        'Athens': 'Greece',
+        'Budapest': 'Hungary'
+    }
+    
+    return destination_map.get(destination, 'Unknown')
+
+# Helper function for saving profile pictures
+def save_profile_picture(form_picture):
+    # Generate a random name for the file to avoid filename collisions
+    random_hex = secrets.token_hex(8)
+    _, file_extension = os.path.splitext(form_picture.filename)
+    picture_filename = random_hex + file_extension
+    
+    # Create path relative to the static directory
+    pictures_path = os.path.join(current_app.root_path, 'static/profile_pics')
+    
+    # Ensure the directory exists
+    os.makedirs(pictures_path, exist_ok=True)
+    
+    # Save path
+    picture_path = os.path.join(pictures_path, picture_filename)
+    
+    # Resize image to save space and improve load time
+    output_size = (150, 150)
+    i = Image.open(form_picture)
+    i.thumbnail(output_size)
+    i.save(picture_path)
+    
+    return picture_filename

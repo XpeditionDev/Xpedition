@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row">
+        <div class="col-md-4 mb-4">
+            <div class="card">
+                <div class="card-body text-center">
+                    <img src="{{ url_for('static', filename='profile_pics/' + current_user.profile_picture) }}" 
+                         class="rounded-circle img-fluid mb-3" style="width: 150px; height: 150px; object-fit: cover;">
+                    <h4 class="card-title">{{ current_user.username }}</h4>
+                    <p class="text-muted">{{ current_user.email }}</p>
+                    <p class="text-muted">Member since: {{ current_user.created_at.strftime('%B %d, %Y') }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <ul class="nav nav-tabs mb-4" id="profileTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile-info" 
+                            type="button" role="tab" aria-controls="profile-info" aria-selected="true">
+                        Profile Information
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password-change" 
+                            type="button" role="tab" aria-controls="password-change" aria-selected="false">
+                        Change Password
+                    </button>
+                </li>
+            </ul>
+            
+            <div class="tab-content" id="profileTabsContent">
+                <!-- Profile Information Tab -->
+                <div class="tab-pane fade show active" id="profile-info" role="tabpanel" aria-labelledby="profile-tab">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Edit Profile</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST" enctype="multipart/form-data">
+                                {{ profile_form.csrf_token }}
+                                <input type="hidden" name="update_profile" value="1">
+                                
+                                <div class="mb-3">
+                                    {{ profile_form.username.label(class="form-label") }}
+                                    {{ profile_form.username(class="form-control") }}
+                                    {% if profile_form.username.errors %}
+                                        <div class="text-danger">
+                                            {% for error in profile_form.username.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ profile_form.email.label(class="form-label") }}
+                                    {{ profile_form.email(class="form-control") }}
+                                    {% if profile_form.email.errors %}
+                                        <div class="text-danger">
+                                            {% for error in profile_form.email.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ profile_form.profile_picture.label(class="form-label") }}
+                                    {{ profile_form.profile_picture(class="form-control") }}
+                                    <small class="form-text text-muted">Upload a new profile picture (JPG, PNG or GIF).</small>
+                                    {% if profile_form.profile_picture.errors %}
+                                        <div class="text-danger">
+                                            {% for error in profile_form.profile_picture.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Change Password Tab -->
+                <div class="tab-pane fade" id="password-change" role="tabpanel" aria-labelledby="password-tab">
+                    <div class="card">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0">Change Password</h5>
+                        </div>
+                        <div class="card-body">
+                            <form method="POST">
+                                {{ password_form.csrf_token }}
+                                <input type="hidden" name="change_password" value="1">
+                                
+                                <div class="mb-3">
+                                    {{ password_form.current_password.label(class="form-label") }}
+                                    {{ password_form.current_password(class="form-control") }}
+                                    {% if password_form.current_password.errors %}
+                                        <div class="text-danger">
+                                            {% for error in password_form.current_password.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ password_form.new_password.label(class="form-label") }}
+                                    {{ password_form.new_password(class="form-control") }}
+                                    {% if password_form.new_password.errors %}
+                                        <div class="text-danger">
+                                            {% for error in password_form.new_password.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="mb-3">
+                                    {{ password_form.confirm_password.label(class="form-label") }}
+                                    {{ password_form.confirm_password(class="form-control") }}
+                                    {% if password_form.confirm_password.errors %}
+                                        <div class="text-danger">
+                                            {% for error in password_form.confirm_password.errors %}
+                                                <small>{{ error }}</small>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">Update Password</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

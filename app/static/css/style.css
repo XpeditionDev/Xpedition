@@ -1,0 +1,676 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color, #f5f5f5);
+    color: var(--text-color, #333333);
+    line-height: 1.6;
+    font-size: var(--font-size-base, 1rem) !important;
+}
+
+/* Navigation */
+nav {
+    background-color: #2c3e50;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.nav-brand {
+    color: white;
+    font-size: 1.8rem;
+    font-weight: bold;
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-links a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+.nav-links a:hover {
+    background-color: rgba(255,255,255,0.1);
+}
+
+/* Content Area */
+.content {
+    max-width: 1200px;
+    margin: 2rem auto;
+    padding: 0 2rem;
+}
+
+/* Dashboard */
+.dashboard-actions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.action-button {
+    background-color: #3498db;
+    color: white;
+    text-decoration: none;
+    padding: 2rem;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 1.2rem;
+    font-weight: 500;
+    transition: transform 0.3s, box-shadow 0.3s;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.action-button:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+}
+
+/* Welcome Message */
+h1, h2, h3, h4, h5, h6 {
+    color: var(--text-color, #2c3e50);
+    margin-bottom: 1rem;
+}
+
+h1 {
+    font-size: 2.5rem;
+    text-align: center;
+    padding-bottom: 1rem;
+    border-bottom: 3px solid #3498db;
+    margin-bottom: 2rem;
+}
+
+/* Search Form */
+.search-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin: 2rem 0;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.form-group input, 
+.form-control,
+.form-select,
+textarea {
+    background-color: var(--input-bg, #ffffff);
+    color: var(--input-color, #333333);
+    border: 1px solid var(--border-color, #dee2e6);
+    width: 100%;
+    padding: 0.8rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s;
+}
+
+.form-group input:focus, 
+.form-control:focus,
+.form-select:focus,
+textarea:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+.search-button {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    font-size: 1.1rem;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.search-button:hover {
+    background: #2980b9;
+}
+
+/* Flight Cards */
+.flight-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.flight-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    transition: transform 0.3s;
+}
+
+.flight-card:hover {
+    transform: translateY(-5px);
+}
+
+.price {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #3498db;
+    margin-bottom: 1rem;
+}
+
+.flight-details {
+    margin-bottom: 1.5rem;
+}
+
+.time {
+    font-size: 1.3rem;
+    margin-bottom: 0.8rem;
+    color: #2c3e50;
+}
+
+.airports {
+    font-weight: 600;
+    color: #34495e;
+    margin-bottom: 0.5rem;
+}
+
+.airline {
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+}
+
+.select-flight {
+    background: #2ecc71;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    font-size: 1rem;
+    font-weight: 500;
+    transition: background-color 0.3s;
+}
+
+.select-flight:hover {
+    background: #27ae60;
+}
+
+/* Search Container Layout */
+.search-container {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 2rem;
+}
+
+/* Filters Panel */
+.filters {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    height: fit-content;
+}
+
+.filters h3 {
+    color: #2c3e50;
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #e0e0e0;
+}
+
+.filter-group {
+    margin-bottom: 1.5rem;
+}
+
+.filter-group label {
+    display: block;
+    margin-bottom: 0.8rem;
+    font-weight: 600;
+    color: #2c3e50;
+}
+
+.price-inputs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.price-inputs input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 4px;
+}
+
+.checkbox-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.checkbox-group label {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-weight: normal;
+    margin-bottom: 0;
+    cursor: pointer;
+}
+
+.checkbox-group input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+/* Main Content Area */
+.main-content {
+    flex: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .nav-links {
+        gap: 1rem;
+    }
+    
+    .nav-links a {
+        padding: 0.3rem 0.8rem;
+        font-size: 0.9rem;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+    
+    .content {
+        padding: 0 1rem;
+    }
+    
+    .dashboard-actions {
+        grid-template-columns: 1fr;
+    }
+    
+    .search-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .filters {
+        order: 2;
+    }
+    
+    .main-content {
+        order: 1;
+    }
+}
+
+/* Modal Styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 15% auto;
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    position: relative;
+    box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+}
+
+.close {
+    position: absolute;
+    right: 1.5rem;
+    top: 1rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.close:hover {
+    color: #000;
+}
+
+.save-button {
+    background: #2ecc71;
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+    font-size: 1rem;
+    font-weight: 500;
+    margin-top: 1rem;
+    transition: background-color 0.3s;
+}
+
+.save-button:hover {
+    background: #27ae60;
+}
+
+select {
+    width: 100%;
+    padding: 0.8rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 1rem;
+    margin-top: 0.5rem;
+    background-color: white;
+}
+
+select:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+/* Auth Forms */
+.auth-container {
+    max-width: 500px;
+    margin: 2rem auto;
+    padding: 2rem;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.auth-container h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 2rem;
+}
+
+.flash-messages {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+}
+
+.flash-messages.error {
+    background-color: #fee2e2;
+    border: 1px solid #ef4444;
+    color: #b91c1c;
+}
+
+.flash-messages.success {
+    background-color: #dcfce7;
+    border: 1px solid #22c55e;
+    color: #15803d;
+}
+
+.password-requirements {
+    margin-top: 0.5rem;
+    padding: 1rem;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+
+.password-requirements ul {
+    list-style: none;
+    padding-left: 0;
+    margin-top: 0.5rem;
+}
+
+.password-requirements li {
+    margin: 0.3rem 0;
+    font-size: 0.9rem;
+}
+
+.form-group small.error {
+    color: #ef4444;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+
+.hidden {
+    display: none;
+}
+
+button[type="submit"]:disabled {
+    background: #94a3b8;
+    cursor: not-allowed;
+}
+
+.auth-link {
+    text-align: center;
+    margin-top: 1rem;
+}
+
+.auth-link a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+.auth-link a:hover {
+    text-decoration: underline;
+}
+
+/* Plan Holiday Styles */
+.plan-holiday-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    margin-bottom: 2rem;
+}
+
+.create-button {
+    background: #3498db;
+    color: white;
+    border: none;
+    padding: 1rem 2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: 500;
+    width: 100%;
+    transition: background-color 0.3s;
+}
+
+.create-button:hover {
+    background: #2980b9;
+}
+
+.itinerary-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 2rem;
+    margin-top: 1rem;
+}
+
+.itinerary-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.itinerary-card h3 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.itinerary-card p {
+    color: #666;
+    margin-bottom: 0.5rem;
+}
+
+.view-button {
+    display: inline-block;
+    background: #2ecc71;
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    transition: background-color 0.3s;
+}
+
+.view-button:hover {
+    background: #27ae60;
+}
+
+/* Card styles should also use variables */
+.card, .search-form, .flight-card, .filters {
+    background-color: var(--card-bg, white);
+    border: 1px solid var(--border-color, #dee2e6);
+}
+
+/* Ensure all text elements respect the font size */
+p, div, span, a, input, button, select, textarea, label, li {
+    font-size: inherit;
+}
+
+/* Additional Dark Mode Styles */
+body[data-theme="dark"] {
+    color: #e0e0e0 !important;
+    background-color: var(--bg-color, #121212) !important;
+}
+
+body[data-theme="dark"] .card,
+body[data-theme="dark"] .search-form,
+body[data-theme="dark"] .flight-card,
+body[data-theme="dark"] .filters {
+    border: 1px solid #444 !important;
+    background-color: #1e1e1e !important;
+    color: #e0e0e0 !important;
+}
+
+body[data-theme="dark"] .card-header {
+    background-color: #2d2d2d !important;
+    border-bottom: 1px solid #444 !important;
+}
+
+body[data-theme="dark"] .btn-outline-secondary {
+    color: #adb5bd !important;
+    border-color: #adb5bd !important;
+}
+
+body[data-theme="dark"] input, 
+body[data-theme="dark"] select, 
+body[data-theme="dark"] textarea {
+    background-color: #333 !important;
+    color: #e0e0e0 !important;
+    border-color: #555 !important;
+}
+
+body[data-theme="dark"] input:focus, 
+body[data-theme="dark"] select:focus, 
+body[data-theme="dark"] textarea:focus {
+    background-color: #3a3a3a !important;
+    color: #fff !important;
+}
+
+body[data-theme="dark"] label,
+body[data-theme="dark"] .form-label,
+body[data-theme="dark"] .form-check-label {
+    color: #e0e0e0 !important;
+}
+
+body[data-theme="dark"] .form-text,
+body[data-theme="dark"] .text-muted {
+    color: var(--muted-color, #6c757d) !important;
+}
+
+body[data-theme="dark"] .dropdown-menu {
+    background-color: #333 !important;
+    border-color: #444 !important;
+}
+
+body[data-theme="dark"] .dropdown-item {
+    color: #e0e0e0 !important;
+}
+
+body[data-theme="dark"] .dropdown-item:hover {
+    background-color: #444 !important;
+    color: #fff !important;
+}
+
+body[data-theme="dark"] .dropdown-divider {
+    border-color: #444 !important;
+}
+
+body[data-theme="dark"] .alert-info {
+    background-color: #0d3a4f !important;
+    border-color: #0f5c83 !important;
+    color: #a8d7f0 !important;
+}
+
+body[data-theme="dark"] table {
+    color: #e0e0e0 !important;
+}
+
+body[data-theme="dark"] th {
+    border-color: #444 !important;
+}
+
+body[data-theme="dark"] td {
+    border-color: #333 !important;
+}
+
+body[data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+    background-color: #2a2a2a !important;
+    color: #e0e0e0 !important;
+}
+
+body[data-theme="dark"] .table-hover > tbody > tr:hover > * {
+    background-color: #3a3a3a !important;
+    color: #fff !important;
+}
+
+/* Dropdown menus */
+.dropdown-menu {
+    background-color: var(--card-bg, #ffffff);
+    border-color: var(--border-color, #dee2e6);
+}
+
+.dropdown-item {
+    color: var(--text-color, #333333);
+}
+
+.dropdown-divider {
+    border-color: var(--border-color, #dee2e6);
+}
+
+/* Tables */
+.table {
+    color: var(--text-color, #333333);
+}
+
+.table th,
+.table td {
+    border-color: var(--border-color, #dee2e6);
+} 

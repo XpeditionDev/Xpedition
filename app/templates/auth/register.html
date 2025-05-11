@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Register{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h1 class="h3 mb-0">Register</h1>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                        <small class="form-text text-muted">Username must be at least 6 characters long and can only contain letters and numbers.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                        <small class="form-text text-muted">Password must be at least 8 characters long and include uppercase, number, and special character.</small>
+                    </div>
+                    <div class="mb-3">
+                        <label for="confirm_password" class="form-label">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirm_password" name="confirm_password" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">Register</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer text-center">
+                <p class="mb-0">Already have an account? <a href="{{ url_for('auth.login') }}">Sign in here</a></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const password = document.getElementById('password');
+    const confirmPassword = document.getElementById('confirm_password');
+    const submitBtn = document.getElementById('submit-btn');
+    const lengthCheck = document.getElementById('length-check');
+    const uppercaseCheck = document.getElementById('uppercase-check');
+    const numberCheck = document.getElementById('number-check');
+    const specialCheck = document.getElementById('special-check');
+    const passwordMatch = document.getElementById('password-match');
+
+    function updateRequirements(password) {
+        // Length check
+        if(password.length >= 8) {
+            lengthCheck.innerHTML = '✅ At least 8 characters';
+        } else {
+            lengthCheck.innerHTML = '❌ At least 8 characters';
+        }
+
+        // Uppercase check
+        if(/[A-Z]/.test(password)) {
+            uppercaseCheck.innerHTML = '✅ One uppercase letter';
+        } else {
+            uppercaseCheck.innerHTML = '❌ One uppercase letter';
+        }
+
+        // Number check
+        if(/[0-9]/.test(password)) {
+            numberCheck.innerHTML = '✅ One number';
+        } else {
+            numberCheck.innerHTML = '❌ One number';
+        }
+
+        // Special character check
+        if(/[!@#$%^&*()_+\-=\[\]{};:,.<>?]/.test(password)) {
+            specialCheck.innerHTML = '✅ One special character';
+        } else {
+            specialCheck.innerHTML = '❌ One special character';
+        }
+    }
+
+    function validateForm() {
+        const password = document.getElementById('password').value;
+        const confirmPass = document.getElementById('confirm_password').value;
+        
+        const hasLength = password.length >= 8;
+        const hasUppercase = /[A-Z]/.test(password);
+        const hasNumber = /[0-9]/.test(password);
+        const hasSpecial = /[!@#$%^&*()_+\-=\[\]{};:,.<>?]/.test(password);
+        const passwordsMatch = password === confirmPass;
+
+        if (passwordsMatch) {
+            passwordMatch.classList.add('hidden');
+        } else {
+            passwordMatch.classList.remove('hidden');
+        }
+
+        submitBtn.disabled = !(hasLength && hasUppercase && hasNumber && hasSpecial && passwordsMatch);
+    }
+
+    password.addEventListener('input', function() {
+        updateRequirements(this.value);
+        validateForm();
+    });
+
+    confirmPassword.addEventListener('input', validateForm);
+});
+</script>
+{% endblock %} 

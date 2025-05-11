@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Search Hotels{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Search Hotels</h1>
+    
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('search.hotel_search') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label for="city" class="form-label">City (IATA Code)</label>
+                            <input type="text" class="form-control" id="city" name="city" 
+                                   required placeholder="e.g., LON">
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label for="check_in" class="form-label">Check-in Date</label>
+                            <input type="date" class="form-control" id="check_in" name="check_in" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label for="check_out" class="form-label">Check-out Date</label>
+                            <input type="date" class="form-control" id="check_out" name="check_out" required>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="mb-3">
+                            <label for="guests" class="form-label">Guests</label>
+                            <input type="number" class="form-control" id="guests" name="guests" 
+                                   min="1" max="10" value="1">
+                        </div>
+                    </div>
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary">Search Hotels</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('check_in').min = today;
+    document.getElementById('check_out').min = today;
+    
+    // Update check-out minimum date when check-in changes
+    document.getElementById('check_in').addEventListener('change', function() {
+        document.getElementById('check_out').min = this.value;
+        if (document.getElementById('check_out').value < this.value) {
+            document.getElementById('check_out').value = this.value;
+        }
+    });
+});
+</script>
+{% endblock %}

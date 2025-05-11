@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+
+{% block title %}AI Itinerary Generator{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="mb-4">AI Itinerary Generator</h1>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Your Preferences</h5>
+                </div>
+                <div class="card-body">
+                    <form id="ai-itinerary-form">
+                        <div class="form-group mb-3">
+                            <label for="destination">Destination</label>
+                            <input type="text" class="form-control" id="destination" name="destination" required>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="duration">Duration (days)</label>
+                            <input type="number" class="form-control" id="duration" name="duration" min="1" max="30" value="5" required>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label for="budget">Budget ($)</label>
+                            <input type="number" class="form-control" id="budget" name="budget" min="100" value="2000" required>
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            <label>Interests</label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="interests" value="sightseeing" id="interest-sightseeing" checked>
+                                <label class="form-check-label" for="interest-sightseeing">Sightseeing</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="interests" value="culture" id="interest-culture">
+                                <label class="form-check-label" for="interest-culture">Culture</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="interests" value="food" id="interest-food">
+                                <label class="form-check-label" for="interest-food">Food & Dining</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="interests" value="adventure" id="interest-adventure">
+                                <label class="form-check-label" for="interest-adventure">Adventure</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="interests" value="relaxation" id="interest-relaxation">
+                                <label class="form-check-label" for="interest-relaxation">Relaxation</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary" id="generate-btn">Generate Itinerary</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div id="loading" style="display: none;">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Generating your personalized itinerary...</p>
+                </div>
+            </div>
+            
+            <div id="itinerary-results" style="display: none;">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('ai-itinerary-form');
+    const loadingDiv = document.getElementById('loading');
+    const resultsDiv = document.getElementById('itinerary-results');
+    
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // Show loading indicator
+        loadingDiv.style.display = 'block';
+        resultsDiv.style.display = 'none';
+        
+        // Get form data
+        const formData = new FormData(form);
+        
+        // Send AJAX request
+        fetch('{{ url_for("main.generate_ai_itinerary") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            // Hide loading indicator
+            loadingDiv.style.display = 'none';
+            
+            // Display results
+            displayAIItinerary(data);
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            loadingDiv.style.display = 'none';
+            resultsDiv.innerHTML = '<div class="alert alert-danger">An error occurred while generating your itinerary. Please try again.</div>';
+            resultsDiv.style.display = 'block';
+        });
+    });
+    
+    function displayAIItinerary(data) {
+        // Scroll to results container and show it
+        resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        
+        if (data.error) {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            resultsDiv.style.display = 'block';
+            return;
+        }
+        
+        // Create HTML for the itinerary
+        let html = `
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5>${data.name}</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Destination:</strong> ${data.destination}, ${data.country}</p>
+                    <p><strong>Dates:</strong> ${data.start_date} to ${data.end_date}</p>
+                    <p><strong>Budget:</strong> $${data.total_budget}</p>
+                    
+                    <h6 class="mt-4">Daily Schedule:</h6>
+                    <div class="accordion" id="itineraryAccordion">
+        `;
+        
+        // Add each day to the accordion
+        data.daily_plan.forEach((day, index) => {
+            html += `
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading${index}">
+                        <button class="accordion-button ${index > 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse${index}" aria-expanded="${index === 0}" aria-controls="collapse${index}">
+                            Day ${index + 1}: ${day.date}
+                        </button>
+                    </h2>
+                    <div id="collapse${index}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" aria-labelledby="heading${index}" data-bs-parent="#itineraryAccordion">
+                        <div class="accordion-body">
+                            <ul class="list-group">
+            `;
+            
+            // Add activities for the day
+            day.activities.forEach(activity => {
+                html += `
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${activity.start_time} - ${activity.end_time}</strong>: ${activity.name}
+                                <p class="mb-0 text-muted small">${activity.description || ''}</p>
+                            </div>
+                            <span class="badge bg-primary rounded-pill">$${activity.cost}</span>
+                        </div>
+                    </li>
+                `;
+            });
+            
+            html += `
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        
+        html += `
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h6>Accommodations:</h6>
+                        <ul class="list-group">
+        `;
+        
+        // Add accommodations
+        data.accommodations.forEach(accommodation => {
+            html += `
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    ${accommodation.name}
+                    <span class="badge bg-primary rounded-pill">$${accommodation.cost_per_night}/night</span>
+                </li>
+            `;
+        });
+        
+        html += `
+                        </ul>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <h6>Transportation:</h6>
+                        <ul class="list-group">
+        `;
+        
+        // Add flights
+        if (data.flights && data.flights.length > 0) {
+            data.flights.forEach(flight => {
+                html += `
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>${flight.airline} ${flight.flight_number}</strong><br>
+                                ${flight.departure_airport} to ${flight.arrival_airport}<br>
+                                ${flight.departure_time} - ${flight.arrival_time}
+                            </div>
+                            <span class="badge bg-primary rounded-pill">$${flight.cost}</span>
+                        </div>
+                    </li>
+                `;
+            });
+        } else {
+            html += `<li class="list-group-item">No flights included in this itinerary.</li>`;
+        }
+        
+        html += `
+                        </ul>
+                    </div>
+                    
+                    <div class="mt-4 text-center">
+                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-success">Save Itinerary</a>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        resultsDiv.innerHTML = html;
+        resultsDiv.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

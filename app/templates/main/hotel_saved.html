@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block title %}Hotel Saved{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0">Hotel Saved Successfully!</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-success mb-4">
+                        <h5 class="alert-heading">Great choice!</h5>
+                        <p>Your hotel has been saved to your "{{ itinerary.name }}" itinerary.</p>
+                    </div>
+                    
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Hotel Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <p><strong>{{ hotel.name }}</strong> {% if hotel.rating %}({{ hotel.rating }} ★){% endif %}</p>
+                            <p>{{ hotel.address.city }}, {{ hotel.address.country }}</p>
+                            {% if accommodation %}
+                                <p>Check-in: {{ accommodation.check_in_date.strftime('%Y-%m-%d') }} | Check-out: {{ accommodation.check_out_date.strftime('%Y-%m-%d') }}</p>
+                                <p>Room Type: {{ accommodation.type }}</p>
+                                <p>Price per night: {{ "%.2f"|format(accommodation.cost_per_night) }}</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Add Map Card -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Hotel Location</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="hotel-map" style="height: 300px;"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <p class="mb-0">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You can now proceed to book your hotel directly using this link:
+                            <a href="{{ booking_url }}" target="_blank" class="alert-link">Book Now</a>
+                        </p>
+                    </div>
+                    
+                    <div class="d-grid gap-2 d-md-flex justify-content-md-center mt-4">
+                        <a href="{{ url_for('main.hotel_search') }}" class="btn btn-outline-primary me-md-2">
+                            <i class="fas fa-search me-2"></i>Search More Hotels
+                        </a>
+                        <a href="{{ url_for('main.itinerary_detail', itinerary_id=itinerary.id) }}" class="btn btn-outline-success">
+                            <i class="fas fa-map-marked-alt me-2"></i>View Itinerary
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Simple error handling for the map
+    if (document.getElementById('hotel-map')) {
+        document.getElementById('hotel-map').innerHTML = 
+            '<div class="alert alert-info">Hotel location: {{ hotel.address.city }}, {{ hotel.address.country }}</div>';
+    }
+});
+</script>
+{% endblock %} 

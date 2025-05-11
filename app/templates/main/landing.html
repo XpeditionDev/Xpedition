@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron text-center py-5">
+    <h1 class="display-4">Welcome to Xpedition</h1>
+    <p class="lead">Your Ultimate Student Holiday Planner</p>
+    <hr class="my-4">
+    <p>Plan your perfect getaway with ease. Create itineraries, find flights, book accommodations, and more!</p>
+    <div class="mt-4">
+        <a class="btn btn-primary btn-lg me-3" href="{{ url_for('auth.register') }}" role="button">Get Started</a>
+        <a class="btn btn-outline-primary btn-lg" href="{{ url_for('auth.login') }}" role="button">Sign In</a>
+    </div>
+</div>
+
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <i class="fas fa-map-marked-alt fa-3x mb-3"></i>
+                    <h3 class="card-title">Plan Your Trip</h3>
+                    <p class="card-text">Create detailed itineraries for your perfect holiday. Add flights, accommodations, and activities all in one place.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <i class="fas fa-plane fa-3x mb-3"></i>
+                    <h3 class="card-title">Find Flights</h3>
+                    <p class="card-text">Search and compare flights to your destination. Save your favorite options and track prices.</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-body text-center">
+                    <i class="fas fa-hotel fa-3x mb-3"></i>
+                    <h3 class="card-title">Book Accommodations</h3>
+                    <p class="card-text">Find the perfect place to stay during your trip. Compare hotels, hostels, and more.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Why Choose Xpedition?</h4>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Designed specifically for students</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Easy-to-use interface</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Budget-friendly options</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> AI-powered recommendations</li>
+                        <li class="mb-2"><i class="fas fa-check text-success me-2"></i> Secure and reliable</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">Getting Started is Easy</h4>
+                    <ol class="list-unstyled">
+                        <li class="mb-3"><span class="badge bg-primary me-2">1</span> Create your free account</li>
+                        <li class="mb-3"><span class="badge bg-primary me-2">2</span> Plan your dream holiday</li>
+                        <li class="mb-3"><span class="badge bg-primary me-2">3</span> Book your flights and accommodations</li>
+                        <li class="mb-3"><span class="badge bg-primary me-2">4</span> Enjoy your trip!</li>
+                    </ol>
+                    <div class="text-center mt-3">
+                        <a href="{{ url_for('auth.register') }}" class="btn btn-success">Create Your Account Now</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

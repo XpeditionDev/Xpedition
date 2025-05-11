@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Search Hotels by Price{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-dark text-white">
+            <h2 class="mb-0">Hotel Price Search</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('search.hotel_price_search') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="city" class="form-label">City (IATA Code)</label>
+                            <input type="text" class="form-control" id="city" name="city" 
+                                   required placeholder="e.g., LON" value="{{ request.form.get('city', '') }}">
+                            <small class="text-muted">Enter the 3-letter city code (e.g., LON for London)</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="guests" class="form-label">Number of Guests</label>
+                            <input type="number" class="form-control" id="guests" name="guests" min="1" max="10"
+                                   value="{{ request.form.get('guests', 2) }}">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="check_in" class="form-label">Check-in Date</label>
+                            <input type="date" class="form-control" id="check_in" name="check_in" 
+                                   required value="{{ request.form.get('check_in', today_date) }}">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="check_out" class="form-label">Check-out Date</label>
+                            <input type="date" class="form-control" id="check_out" name="check_out" 
+                                   required value="{{ request.form.get('check_out', tomorrow_date) }}">
+                        </div>
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="price" class="form-label">Target Price per Night (GBP)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">£</span>
+                                <input type="number" class="form-control" id="price" name="price" min="10" step="0.01"
+                                       required value="{{ request.form.get('price', 150) }}">
+                            </div>
+                            <small class="text-muted">Enter your desired price per night</small>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="tolerance" class="form-label">Price Tolerance (GBP)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">£</span>
+                                <input type="number" class="form-control" id="tolerance" name="tolerance" min="0" step="0.01"
+                                       required value="{{ request.form.get('tolerance', 50) }}">
+                            </div>
+                            <small class="text-muted">Maximum price difference from your target</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="form-check mb-4">
+                    <input type="checkbox" class="form-check-input" id="adaptive_tolerance" name="adaptive_tolerance" 
+                           {% if request.form.get('adaptive_tolerance') == 'on' %}checked{% endif %}>
+                    <label class="form-check-label" for="adaptive_tolerance">
+                        Use adaptive tolerance if no exact matches found
+                    </label>
+                    <small class="d-block text-muted">
+                        When enabled, the system will automatically adjust the tolerance to find the closest match if no hotels are found within your specified tolerance
+                    </small>
+                </div>
+                
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">Search Hotels</button>
+                </div>
+            </form>
+        </div>
+        <div class="card-footer">
+            <div class="text-muted small">
+                <p class="mb-0"><i class="fa fa-info-circle"></i> This search uses a binary search algorithm to efficiently find hotels within your target price range.</p>
+                <p class="mb-0">The results will show you a visualization of how the binary search algorithm narrows down the options.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Set minimum dates
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('check_in').min = today;
+    document.getElementById('check_out').min = today;
+    
+    // Update check-out minimum date when check-in changes
+    document.getElementById('check_in').addEventListener('change', function() {
+        document.getElementById('check_out').min = this.value;
+        // If check-out date is before check-in date, update it
+        if (document.getElementById('check_out').value < this.value) {
+            document.getElementById('check_out').value = this.value;
+        }
+    });
+});
+</script>
+{% endblock %} 

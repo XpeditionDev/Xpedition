@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Hotel Search Results{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Hotel Search Results</h1>
+    
+    <div class="row">
+        <div class="col-md-3">
+            <!-- Filters -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Filters</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">Price Range</label>
+                        <input type="range" class="form-range" id="priceRange">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Rating</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="5">
+                            <label class="form-check-label">5 Stars</label>
+                        </div>
+                        <!-- Add more rating options -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-9">
+            <!-- Results -->
+            {% if hotels %}
+                {% for hotel in hotels %}
+                <div class="card mb-3 hotel-card">
+                    <div class="row g-0">
+                        <div class="col-md-4">
+                            <img src="{{ hotel.image_url|default('/static/images/hotels/placeholder.jpg') }}" 
+                                 class="img-fluid rounded-start" alt="{{ hotel.name }}">
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card-body">
+                                <h5 class="card-title">{{ hotel.name }}</h5>
+                                <p class="card-text">
+                                    <small class="text-muted">{{ hotel.address }}</small>
+                                </p>
+                                <p class="card-text">
+                                    <strong>Rating:</strong> {{ hotel.rating }}
+                                    <br>
+                                    <strong>Room Type:</strong> {{ hotel.room_type }}
+                                    <br>
+                                    <strong>Price:</strong> {{ hotel.currency }} {{ hotel.price }}
+                                </p>
+                                
+                                <!-- Modal trigger buttons -->
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#hotelDetailModal{{ hotel.id }}">
+                                        View Details
+                                    </button>
+                                    {% if current_user.is_authenticated %}
+                                    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#saveHotelModal{{ hotel.id }}">
+                                        Save to Itinerary
+                                    </button>
+                                    {% else %}
+                                    <a href="{{ url_for('auth.login') }}" class="btn btn-success">
+                                        Login to Save
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Hotel Detail Modal -->
+                <div class="modal fade" id="hotelDetailModal{{ hotel.id }}" tabindex="-1" aria-labelledby="hotelDetailModalLabel{{ hotel.id }}" aria-hidden="true">
+                    <div class="modal-dialog modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="hotelDetailModalLabel{{ hotel.id }}">{{ hotel.name }}</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <img src="{{ hotel.image_url|default('/static/images/hotels/placeholder.jpg') }}" 
+                                             class="img-fluid rounded" alt="{{ hotel.name }}">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <h5>Hotel Details</h5>
+                                        <p><strong>Address:</strong> {{ hotel.address }}</p>
+                                        <p><strong>Rating:</strong> {{ hotel.rating }} stars</p>
+                                        <p><strong>Room Type:</strong> {{ hotel.room_type }}</p>
+                                        <p><strong>Price:</strong> {{ hotel.currency }} {{ hotel.price }} per night</p>
+                                        
+                                        <h5 class="mt-3">Amenities</h5>
+                                        <ul class="list-group">
+                                            {% for amenity in hotel.amenities %}
+                                                <li class="list-group-item">{{ amenity }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                {% if current_user.is_authenticated %}
+                                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#saveHotelModal{{ hotel.id }}">
+                                    Save to Itinerary
+                                </button>
+                                {% else %}
+                                <a href="{{ url_for('auth.login') }}" class="btn btn-success">
+                                    Login to Save
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Save Hotel Modal -->
+                {% if current_user.is_authenticated %}
+                <div class="modal fade" id="saveHotelModal{{ hotel.id }}" tabindex="-1" aria-labelledby="saveHotelModalLabel{{ hotel.id }}" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title" id="saveHotelModalLabel{{ hotel.id }}">Save {{ hotel.name }} to Itinerary</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <form method="POST" action="{{ url_for('search.save_hotel_to_itinerary') }}">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="hotel_data" value='{"id": {{ hotel.id }}, "name": "{{ hotel.name|replace('"', '\\"') }}", "address": "{{ hotel.address|replace('"', '\\"') }}", "price": {{ hotel.price }}, "currency": "{{ hotel.currency }}", "room_type": "{{ hotel.room_type|replace('"', '\\"') }}", "type": "{{ hotel.type|default('hotel')|replace('"', '\\"') }}"}'>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <label for="itinerary_select{{ hotel.id }}" class="form-label">Select Itinerary</label>
+                                        <select class="form-select" id="itinerary_select{{ hotel.id }}" name="itinerary_id" required>
+                                            <option value="">-- Select an Itinerary --</option>
+                                            {% if user_itineraries %}
+                                                {% for itinerary in user_itineraries %}
+                                                    <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                                                {% endfor %}
+                                            {% endif %}
+                                            <option value="new">+ Create New Itinerary</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="mb-3 new-itinerary-name" id="newItineraryDiv{{ hotel.id }}" style="display: none;">
+                                        <label for="new_itinerary_name{{ hotel.id }}" class="form-label">New Itinerary Name</label>
+                                        <input type="text" class="form-control" id="new_itinerary_name{{ hotel.id }}" name="new_itinerary_name" placeholder="My Awesome Trip">
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="check_in_date{{ hotel.id }}" class="form-label">Check-in Date</label>
+                                        <input type="date" class="form-control" id="check_in_date{{ hotel.id }}" name="check_in_date" required>
+                                    </div>
+                                    
+                                    <div class="mb-3">
+                                        <label for="check_out_date{{ hotel.id }}" class="form-label">Check-out Date</label>
+                                        <input type="date" class="form-control" id="check_out_date{{ hotel.id }}" name="check_out_date" required>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-success">Save to Itinerary</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    // Handle showing/hiding new itinerary name field
+                    const itinerarySelect{{ hotel.id }} = document.getElementById('itinerary_select{{ hotel.id }}');
+                    const newItineraryDiv{{ hotel.id }} = document.getElementById('newItineraryDiv{{ hotel.id }}');
+                    
+                    itinerarySelect{{ hotel.id }}.addEventListener('change', function() {
+                        if (this.value === 'new') {
+                            newItineraryDiv{{ hotel.id }}.style.display = 'block';
+                        } else {
+                            newItineraryDiv{{ hotel.id }}.style.display = 'none';
+                        }
+                    });
+                    
+                    // Set min dates for hotel booking
+                    const today = new Date().toISOString().split('T')[0];
+                    document.getElementById('check_in_date{{ hotel.id }}').min = today;
+                    document.getElementById('check_out_date{{ hotel.id }}').min = today;
+                    
+                    // Update check-out min date when check-in changes
+                    document.getElementById('check_in_date{{ hotel.id }}').addEventListener('change', function() {
+                        document.getElementById('check_out_date{{ hotel.id }}').min = this.value;
+                    });
+                });
+                </script>
+                {% endif %}
+                
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    No hotels found matching your criteria.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Save Flight to Itinerary</h4>
+                </div>
+                <div class="card-body">
+                    <div class="flight-details mb-4 p-3 bg-light rounded">
+                        <h5 class="mb-3">Flight Details</h5>
+                        {% if flight.segments|length > 1 %}
+                            {% for segment in flight.segments %}
+                            <div class="segment-details mb-3">
+                                <h6>
+                                    {% if loop.index == 1 %}
+                                        <span class="badge bg-primary">Outbound</span>
+                                    {% elif loop.index == flight.segments|length and flight.segments|length > 2 %}
+                                        <span class="badge bg-info">Final Connection</span>
+                                    {% elif loop.index == flight.segments|length %}
+                                        <span class="badge bg-primary">Return</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Connection</span>
+                                    {% endif %}
+                                    Flight {{ loop.index }} of {{ flight.segments|length }}
+                                </h6>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <p><strong>Airline:</strong> {{ segment.carrierCode }} {{ segment.number }}</p>
+                                        <p><strong>From:</strong> {{ segment.departure.iataCode }}</p>
+                                        <p><strong>To:</strong> {{ segment.arrival.iataCode }}</p>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <p><strong>Departure:</strong> {{ segment.departure.at|replace('T', ' ')|replace('Z', '') }}</p>
+                                        <p><strong>Arrival:</strong> {{ segment.arrival.at|replace('T', ' ')|replace('Z', '') }}</p>
+                                        {% if loop.index == 1 %}
+                                            <p><strong>Total Price:</strong> {{ flight.price.currency }} {{ flight.price.total }}</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% if not loop.last %}
+                                <hr>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <p><strong>Airline:</strong> {{ flight.segments[0].carrierCode }} {{ flight.segments[0].number }}</p>
+                                    <p><strong>From:</strong> {{ flight.segments[0].departure.iataCode }}</p>
+                                    <p><strong>To:</strong> {{ flight.segments[0].arrival.iataCode }}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Departure:</strong> {{ flight.segments[0].departure.at|replace('T', ' ')|replace('Z', '') }}</p>
+                                    <p><strong>Arrival:</strong> {{ flight.segments[0].arrival.at|replace('T', ' ')|replace('Z', '') }}</p>
+                                    <p><strong>Price:</strong> {{ flight.price.currency }} {{ flight.price.total }}</p>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <h5 class="mb-3">Select an Itinerary</h5>
+                    <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <select id="itinerary-select" name="itinerary_id" class="form-select" required>
+                                <option value="" disabled selected>Select an itinerary</option>
+                                {% for itinerary in itineraries %}
+                                <option value="{{ itinerary.id }}">{{ itinerary.name }}</option>
+                                {% endfor %}
+                                <option value="new">Create new itinerary</option>
+                            </select>
+                        </div>
+                        
+                        <div id="new-itinerary-form" class="mb-3 d-none">
+                            <label for="new-itinerary-name" class="form-label">New Itinerary Name</label>
+                            <input type="text" id="new-itinerary-name" name="new_itinerary_name" class="form-control">
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('main.search_flights') }}" class="btn btn-outline-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Save to Itinerary</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const itinerarySelect = document.getElementById('itinerary-select');
+        const newItineraryForm = document.getElementById('new-itinerary-form');
+        const newItineraryInput = document.getElementById('new-itinerary-name');
+        
+        itinerarySelect.addEventListener('change', function() {
+            if (this.value === 'new') {
+                newItineraryForm.classList.remove('d-none');
+                newItineraryInput.setAttribute('required', '');
+            } else {
+                newItineraryForm.classList.add('d-none');
+                newItineraryInput.removeAttribute('required');
+            }
+        });
+    });
+</script>
+{% endblock %} 

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}User Settings{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="h4 mb-0">User Settings</h2>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{{ url_for('main.settings') }}">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="mb-4">
+                            <h5>Appearance</h5>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.theme.label(class="form-label") }}
+                                        {{ form.theme(class="form-select") }}
+                                        <small class="form-text text-muted">Choose your preferred theme</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        {{ form.font_size.label(class="form-label") }}
+                                        {{ form.font_size(class="form-select") }}
+                                        <small class="form-text text-muted">Choose your preferred font size</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <h5>Preferences</h5>
+                            <div class="form-check mb-3">
+                                {{ form.notifications_enabled(class="form-check-input") }}
+                                {{ form.notifications_enabled.label(class="form-check-label") }}
+                                <div><small class="form-text text-muted">Receive notifications about your travel plans</small></div>
+                            </div>
+                            
+                            <div class="form-group">
+                                {{ form.language.label(class="form-label") }}
+                                {{ form.language(class="form-select") }}
+                                <small class="form-text text-muted">Choose your preferred language</small>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary me-md-2">Cancel</a>
+                            {{ form.submit(class="btn btn-primary") }}
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Apply theme and font size immediately when selected
+    document.addEventListener('DOMContentLoaded', function() {
+        const themeSelect = document.getElementById('theme');
+        const fontSizeSelect = document.getElementById('font_size');
+        
+        // Preview theme changes
+        themeSelect.addEventListener('change', function() {
+            document.body.className = document.body.className.replace(/theme-\w+/, '');
+            document.body.classList.add('theme-' + this.value);
+        });
+        
+        // Preview font size changes
+        fontSizeSelect.addEventListener('change', function() {
+            document.body.className = document.body.className.replace(/font-size-\w+/, '');
+            document.body.classList.add('font-size-' + this.value);
+        });
+    });
+</script>
+{% endblock %} 

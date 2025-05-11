@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome to Xpedition{% endblock %}
+
+{% block content %}
+<div class="jumbotron p-5 mb-4 bg-light rounded-3">
+    <div class="container-fluid py-4">
+        <h1 class="display-5 fw-bold">Welcome to Xpedition</h1>
+        <p class="col-md-8 fs-4">Your student holiday planning companion. Discover exciting destinations, plan your trips, and create unforgettable memories.</p>
+        {% if not current_user.is_authenticated %}
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg px-4 me-md-2">Get Started</a>
+            <a href="{{ url_for('auth.login') }}" class="btn btn-outline-primary btn-lg px-4">Login</a>
+        </div>
+        {% else %}
+        <div class="d-grid gap-2 d-md-flex justify-content-md-start">
+            <a href="{{ url_for('main.create_itinerary') }}" class="btn btn-primary btn-lg px-4 me-md-2">Plan Your Trip</a>
+            <a href="{{ url_for('main.my_itineraries') }}" class="btn btn-outline-primary btn-lg px-4">My Itineraries</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-5 mb-4">
+    <div class="col-12">
+        <h2 class="fw-bold text-center">Popular Student Destinations</h2>
+        <p class="text-center text-muted">Explore our most popular student holiday destinations</p>
+    </div>
+</div>
+
+<div class="row">
+    {% if itineraries %}
+        {% for itinerary in itineraries %}
+        <div class="col-md-4 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">{{ itinerary.name }}</h5>
+                    <p class="card-text">
+                        {% if itinerary.start_date %}
+                        <small class="text-muted">
+                            {{ itinerary.start_date.strftime('%d %b %Y') }} - 
+                            {{ itinerary.end_date.strftime('%d %b %Y') }}
+                        </small>
+                        {% endif %}
+                    </p>
+                    <p class="card-text">
+                        {% if itinerary.is_ai_generated %}
+                        <span class="badge bg-info">AI Generated</span>
+                        {% endif %}
+                        {% if itinerary.total_budget %}
+                        <span class="badge bg-success">Budget: £{{ itinerary.total_budget }}</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="card-footer bg-transparent">
+                    <a href="#" class="btn btn-sm btn-outline-primary">View Details</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="col-12 text-center">
+            <p>No featured itineraries available yet.</p>
+        </div>
+    {% endif %}
+</div>
+
+<div class="row mt-5 mb-4">
+    <div class="col-12 text-center">
+        <h2>Why Choose Xpedition?</h2>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-robot fa-3x mb-3 text-primary"></i>
+                <h5 class="card-title">AI-Powered Planning</h5>
+                <p class="card-text">Let our smart AI create personalized itineraries based on your preferences.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-wallet fa-3x mb-3 text-primary"></i>
+                <h5 class="card-title">Student Budget Friendly</h5>
+                <p class="card-text">Find the best deals tailored for student budgets.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body text-center">
+                <i class="fas fa-map-marked-alt fa-3x mb-3 text-primary"></i>
+                <h5 class="card-title">All-in-One Planning</h5>
+                <p class="card-text">Manage flights, accommodations, and activities all in one place.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
